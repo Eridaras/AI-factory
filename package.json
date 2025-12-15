@@ -1,0 +1,31 @@
+{
+  "name": "ai-factory",
+  "version": "1.0.0",
+  "description": "AI Factory - Ecosistema de herramientas MCP para desarrollo asistido por IA",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "audit": "node mcp/perplexity-audit-server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "code-audit",
+    "perplexity",
+    "gemini"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
