@@ -19,14 +19,33 @@ import {
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import dotenv from "dotenv";
 
 // Obtener __dirname en ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Cargar variables de entorno desde .env
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+// Cargar .env manualmente sin usar dotenv (para evitar output a stdout/stderr)
+const envPath = path.resolve(__dirname, "../.env");
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, "utf8");
+  envContent.split("\n").forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      const [key, ...valueParts] = trimmed.split("=");
+      if (key && valueParts.length > 0) {
+        const value = valueParts.join("=").trim();
+        process.env[key.trim()] = value;
+      }
+    }
+  });
+}
+
+// En Node 18+ fetch existe en globalThis, aseguramos que exista
+const _fetch = globalThis.fetch;
+if (typeof _fetch !== "function") {
+  // No usar console.error porque rompe el protocolo MCP
+  process.exit(1);
+}
 
 // Configuración de Perplexity
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
@@ -47,13 +66,12 @@ function log(message) {
     fs.appendFileSync(LOG_FILE, logLine);
   } catch (err) {
     // En caso extremo, no romper el MCP por fallo al loguear
-    console.error("Logging failed:", err.message);
+    // No podemos loguear porque falló el log, simplemente continuar
   }
 }
 
 if (!PERPLEXITY_API_KEY) {
   log("ERROR: PERPLEXITY_API_KEY no está configurada en las variables de entorno");
-  console.error("Error: PERPLEXITY_API_KEY no está configurada en las variables de entorno");
   process.exit(1);
 }
 
@@ -79,14 +97,14 @@ async function queryPerplexity(prompt, systemPrompt = null) {
 
   log(`Llamando a Perplexity API (prompt length: ${prompt.length} chars)`);
 
-  const response = await fetch(PERPLEXITY_API_URL, {
+  const response = await _fetch(PERPLEXITY_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${PERPLEXITY_API_KEY}`
     },
     body: JSON.stringify({
-      model: "llama-3.1-sonar-large-128k-online",
+      model: "sonar-pro",
       messages: messages,
       temperature: 0.2,
       max_tokens: 4000
@@ -165,13 +183,23 @@ Responde SOLO con JSON válido, sin texto adicional antes o después.`;
   try {
     const response = await queryPerplexity(prompt, systemPrompt);
     
-    // Intentar extraer JSON de la respuesta (por si viene con markdown)
+    // Intentar extraer JSON de la respuesta (por si viene con markdown o ruido)
     let jsonStr = response.trim();
-    if (jsonStr.startsWith('```json')) {
-      jsonStr = jsonStr.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
-    } else if (jsonStr.startsWith('```')) {
-      jsonStr = jsonStr.replace(/```\n?/g, '');
+    
+    // Quitar fences de markdown si existen
+    if (jsonStr.startsWith("```")) {
+      jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?$/g, "").trim();
     }
+    
+    // Si aún hay ruido (como [dotenv@17...]), buscar solo el bloque JSON
+    const firstBrace = jsonStr.indexOf("{");
+    const lastBrace = jsonStr.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+      log(`ERROR: No se encontró JSON válido. Respuesta recibida: ${jsonStr.substring(0, 200)}...`);
+      throw new Error("No se encontró un bloque JSON válido en la respuesta de Perplexity");
+    }
+    
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
     
     const parsed = JSON.parse(jsonStr);
     
@@ -188,7 +216,6 @@ Responde SOLO con JSON válido, sin texto adicional antes o después.`;
     return parsed;
   } catch (error) {
     log(`ERROR en stack_status: ${error.message}`);
-    console.error("Error parsing stack_status response:", error);
     throw error; // Relanzar para que Claude vea que la tool falló
   }
 }
@@ -257,13 +284,23 @@ Responde SOLO con JSON válido, sin texto adicional antes o después.`;
   try {
     const response = await queryPerplexity(prompt, systemPrompt);
     
-    // Intentar extraer JSON de la respuesta
+    // Intentar extraer JSON de la respuesta (por si viene con markdown o ruido)
     let jsonStr = response.trim();
-    if (jsonStr.startsWith('```json')) {
-      jsonStr = jsonStr.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
-    } else if (jsonStr.startsWith('```')) {
-      jsonStr = jsonStr.replace(/```\n?/g, '');
+    
+    // Quitar fences de markdown si existen
+    if (jsonStr.startsWith("```")) {
+      jsonStr = jsonStr.replace(/```json\n?/g, "").replace(/```\n?$/g, "").trim();
     }
+    
+    // Si aún hay ruido (como [dotenv@17...]), buscar solo el bloque JSON
+    const firstBrace = jsonStr.indexOf("{");
+    const lastBrace = jsonStr.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+      log(`ERROR: No se encontró JSON válido. Respuesta recibida: ${jsonStr.substring(0, 200)}...`);
+      throw new Error("No se encontró un bloque JSON válido en la respuesta de Perplexity");
+    }
+    
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
     
     const parsed = JSON.parse(jsonStr);
     
@@ -287,7 +324,6 @@ Responde SOLO con JSON válido, sin texto adicional antes o después.`;
     return parsed;
   } catch (error) {
     log(`ERROR en best_practices: ${error.message}`);
-    console.error("Error parsing best_practices response:", error);
     throw error; // Relanzar para que Claude vea que la tool falló
   }
 }
@@ -447,11 +483,9 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   log("MCP Perplexity Audit Server conectado y listo");
-  console.error("MCP Perplexity Audit Server running on stdio");
 }
 
 main().catch((error) => {
   log(`ERROR FATAL al iniciar servidor: ${error.message}`);
-  console.error("Server error:", error);
   process.exit(1);
 });
