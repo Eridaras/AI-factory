@@ -229,7 +229,7 @@ function detectCSharpFeatures(repoPath, files) {
  */
 function detectJavaFeatures(repoPath, files) {
   const features = [];
-  const config = TECH_CONFIG?.languages?.java;
+  const config = TECH_CONFIG?.supported_languages?.java;
   if (!config) return features;
   
   const javaFiles = files.filter(f => f.full.endsWith('.java'));
@@ -303,7 +303,7 @@ function detectJavaFeatures(repoPath, files) {
  */
 function detectPHPFeatures(repoPath, files) {
   const features = [];
-  const config = TECH_CONFIG?.languages?.php;
+  const config = TECH_CONFIG?.supported_languages?.php;
   if (!config) return features;
   
   const phpFiles = files.filter(f => f.full.endsWith('.php'));
@@ -377,7 +377,7 @@ function detectPHPFeatures(repoPath, files) {
  */
 function detectPythonFeatures(repoPath, files) {
   const features = [];
-  const config = TECH_CONFIG?.languages?.python;
+  const config = TECH_CONFIG?.supported_languages?.python;
   if (!config) return features;
   
   const pythonFiles = files.filter(f => f.full.endsWith('.py'));
@@ -464,7 +464,7 @@ function detectPythonFeatures(repoPath, files) {
  */
 function detectJavaScriptFeatures(repoPath, files) {
   const features = [];
-  const config = TECH_CONFIG?.languages?.javascript || TECH_CONFIG?.languages?.typescript;
+  const config = TECH_CONFIG?.supported_languages?.javascript || TECH_CONFIG?.supported_languages?.typescript;
   if (!config) return features;
   
   const jsFiles = files.filter(f => f.full.endsWith('.js') || f.full.endsWith('.ts'));
