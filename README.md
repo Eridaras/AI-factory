@@ -9,7 +9,8 @@ AI Factory es una colección de servidores MCP (Model Context Protocol) y prompt
 AI Factory proporciona **ecosistemas especializados** que Claude Code puede activar según el contexto:
 
 - **🛠 Auditoría de Código**: Analiza proyectos existentes, detecta vulnerabilidades, evalúa el stack tecnológico y propone mejoras o recreación.
-- **💡 Ideación de SaaS** *(próximamente)*: Research de mercado, análisis de competencia y validación de ideas.
+- **� Replicador de Funcionalidades**: Extrae y documenta funcionalidades de repos legacy para replicarlas en nuevos proyectos (BD, queries, rutas, APIs, reglas).
+- **�💡 Ideación de SaaS** *(próximamente)*: Research de mercado, análisis de competencia y validación de ideas.
 - **🎨 Diseño y Branding** *(próximamente)*: Generación de identidad visual, diseño de UI/UX.
 - **🔍 Tool Scout** *(próximamente)*: Descubrimiento y evaluación de herramientas tecnológicas.
 
@@ -27,6 +28,7 @@ Cada ecosistema consta de:
 ai-factory/
 ├── mcp/                                  # Servidores MCP
 │   ├── perplexity-audit-server.js       # Auditoría técnica (Perplexity)
+│   ├── feature-replicator-server.js     # Extracción de funcionalidades legacy
 │   ├── perplexity-research-server.js    # Research de mercado (futuro)
 │   ├── gemini-design-server.js          # Diseño y branding (futuro)
 │   └── README.md
@@ -36,6 +38,11 @@ ai-factory/
 │   ├── NEW_SAAS.md                      # (futuro)
 │   ├── MARKETING.md                     # (futuro)
 │   └── TOOL_SCOUT.md                    # (futuro)
+│
+├── docs/                                 # Documentación y outputs
+│   ├── FEATURES_SPEC/                   # Specs de funcionalidades extraídas
+│   ├── TECH_STACK_STATUS.json           # Estado del stack (auditoría)
+│   └── ...
 │
 ├── scripts/                              # Utilidades CLI
 │   └── run-audit.sh                     # (futuro)

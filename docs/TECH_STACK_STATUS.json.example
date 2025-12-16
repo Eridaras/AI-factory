@@ -1,0 +1,20 @@
+{
+  "language": "csharp",
+  "framework": "aspnet-mvc",
+  "databases": [
+    {
+      "engine": "sap_hana",
+      "name": "B2B_HANA"
+    },
+    {
+      "engine": "sql_server",
+      "name": "B2B_SQL"
+    }
+  ],
+  "notes": "Detectado por auditoría automática con perplexity-audit.",
+  "additional_tech": {
+    "job_scheduler": "windows_task_scheduler",
+    "messaging": "msmq",
+    "file_storage": "network_shares"
+  }
+}

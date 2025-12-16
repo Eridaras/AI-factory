@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "audit": "node mcp/perplexity-audit-server.js",
+    "feature-replicator": "node mcp/feature-replicator-server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
