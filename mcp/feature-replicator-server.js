@@ -2110,7 +2110,7 @@ ${feature_spec.tech_stack ? `
 
 ---
 
-*Documento generado automáticamente por feature-replicator MCP v2.1 (Rich Specs)*
+*Documento generado automáticamente por feature-replicator MCP v2.2 (Business Semantics)*
 `;
     
     // Escribir archivo
