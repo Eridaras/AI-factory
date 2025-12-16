@@ -333,9 +333,10 @@ function detectPHPFeatures(repoPath, files) {
   
   // 2. Legacy: Classes in CAPA_LOGICA (business logic layer)
   for (const file of phpFiles) {
-    if (file.relative.includes('CAPA_LOGICA/') || file.relative.includes('capa_logica/')) {
+    const normalizedRelative = file.relative.replace(/\\/g, '/');
+    if (normalizedRelative.includes('CAPA_LOGICA/') || normalizedRelative.includes('capa_logica/')) {
       const fileName = path.basename(file.relative, '.php');
-      log(`[DEBUG] Checking CAPA_LOGICA file: ${fileName} (relative: ${file.relative})`);
+      log(`[DEBUG] Checking CAPA_LOGICA file: ${fileName} (relative: ${normalizedRelative})`);
       // Detectar archivos que terminan en "Class" o contienen clases
       if (fileName.toLowerCase().includes('class') || fileName.toLowerCase().includes('service')) {
         try {
@@ -364,7 +365,8 @@ function detectPHPFeatures(repoPath, files) {
   
   // 3. Legacy: FUNCIONES directory (utility functions)
   for (const file of phpFiles) {
-    if (file.relative.includes('FUNCIONES/') || file.relative.includes('funciones/')) {
+    const normalizedRelative = file.relative.replace(/\\/g, '/');
+    if (normalizedRelative.includes('FUNCIONES/') || normalizedRelative.includes('funciones/')) {
       const fileName = path.basename(file.relative, '.php');
       // Solo agregar si el archivo tiene al menos una función definida
       try {
@@ -386,7 +388,8 @@ function detectPHPFeatures(repoPath, files) {
   
   // 4. Legacy: CAPA_DATOS (data access layer)
   for (const file of phpFiles) {
-    if (file.relative.includes('CAPA_DATOS/') || file.relative.includes('capa_datos/')) {
+    const normalizedRelative = file.relative.replace(/\\/g, '/');
+    if (normalizedRelative.includes('CAPA_DATOS/') || normalizedRelative.includes('capa_datos/')) {
       const fileName = path.basename(file.relative, '.php');
       try {
         const content = fs.readFileSync(file.full, 'utf8');
