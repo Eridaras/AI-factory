@@ -307,8 +307,9 @@ function detectPHPFeatures(repoPath, files) {
   if (!config) return features;
   
   const phpFiles = files.filter(f => f.full.endsWith('.php'));
+  log(`Analyzing ${phpFiles.length} PHP files for features`);
   
-  // Laravel Controllers (extends Controller, suffix Controller)
+  // 1. Modern Controllers (Laravel/Symfony style)
   for (const file of phpFiles) {
     const fileName = path.basename(file.relative);
     if (fileName.includes('Controller') || file.relative.includes('Controllers/')) {
@@ -330,7 +331,76 @@ function detectPHPFeatures(repoPath, files) {
     }
   }
   
-  // Models (Eloquent models, extends Model)
+  // 2. Legacy: Classes in CAPA_LOGICA (business logic layer)
+  for (const file of phpFiles) {
+    if (file.relative.includes('CAPA_LOGICA/') || file.relative.includes('capa_logica/')) {
+      const fileName = path.basename(file.relative, '.php');
+      // Detectar archivos que terminan en "Class" o contienen clases
+      if (fileName.toLowerCase().includes('class') || fileName.toLowerCase().includes('service')) {
+        try {
+          const content = fs.readFileSync(file.full, 'utf8');
+          // Si el archivo contiene al menos una definición de clase
+          if (/class\s+\w+/.test(content)) {
+            features.push({
+              id: `php-legacy-logic-${fileName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+              type: 'business_logic',
+              language: 'php',
+              files: [file.relative],
+              description: `Legacy Business Logic: ${fileName}`
+            });
+          }
+        } catch (error) {
+          log(`Error reading ${file.full}: ${error.message}`);
+        }
+      }
+    }
+  }
+  
+  // 3. Legacy: FUNCIONES directory (utility functions)
+  for (const file of phpFiles) {
+    if (file.relative.includes('FUNCIONES/') || file.relative.includes('funciones/')) {
+      const fileName = path.basename(file.relative, '.php');
+      // Solo agregar si el archivo tiene al menos una función definida
+      try {
+        const content = fs.readFileSync(file.full, 'utf8');
+        if (/function\s+\w+\s*\(/.test(content)) {
+          features.push({
+            id: `php-legacy-functions-${fileName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            type: 'utility',
+            language: 'php',
+            files: [file.relative],
+            description: `Legacy Functions: ${fileName}`
+          });
+        }
+      } catch (error) {
+        log(`Error reading ${file.full}: ${error.message}`);
+      }
+    }
+  }
+  
+  // 4. Legacy: CAPA_DATOS (data access layer)
+  for (const file of phpFiles) {
+    if (file.relative.includes('CAPA_DATOS/') || file.relative.includes('capa_datos/')) {
+      const fileName = path.basename(file.relative, '.php');
+      try {
+        const content = fs.readFileSync(file.full, 'utf8');
+        // Si contiene queries SQL o conexiones a BD
+        if (/mysql_|mysqli_|PDO|sqlsrv_|SELECT|INSERT|UPDATE|DELETE/i.test(content)) {
+          features.push({
+            id: `php-legacy-data-${fileName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            type: 'data_access',
+            language: 'php',
+            files: [file.relative],
+            description: `Legacy Data Access: ${fileName}`
+          });
+        }
+      } catch (error) {
+        log(`Error reading ${file.full}: ${error.message}`);
+      }
+    }
+  }
+  
+  // 5. Models (Eloquent models, extends Model)
   const modelPattern = /extends\s+Model|use\s+HasFactory/;
   for (const file of phpFiles) {
     if (file.relative.includes('Models/') || file.relative.includes('app/')) {
@@ -352,7 +422,7 @@ function detectPHPFeatures(repoPath, files) {
     }
   }
   
-  // Services
+  // 6. Services (modern pattern)
   for (const file of phpFiles) {
     if (file.relative.includes('Services/') || path.basename(file.relative).includes('Service')) {
       const className = path.basename(file.relative, '.php');
