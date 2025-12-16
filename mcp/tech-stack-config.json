@@ -1,0 +1,166 @@
+{
+  "supported_languages": {
+    "csharp": {
+      "priority": 1,
+      "extensions": [".cs", ".cshtml", ".aspx", ".ascx"],
+      "frameworks": ["aspnet-mvc", "aspnet-core", "aspnet-webforms", "wpf", "winforms"],
+      "controller_patterns": ["*Controller.cs", "*ApiController.cs"],
+      "service_patterns": ["*Service.cs", "I*Service.cs"],
+      "repository_patterns": ["*Repository.cs", "I*Repository.cs"],
+      "query_patterns": ["SqlCommand", "SqlDataAdapter", "DbContext", "LINQ"],
+      "file_io_patterns": ["File.", "Directory.", "StreamReader", "StreamWriter"]
+    },
+    "java": {
+      "priority": 1,
+      "extensions": [".java", ".jsp"],
+      "frameworks": ["spring", "spring-boot", "javaee", "jsf", "struts"],
+      "controller_patterns": ["*Controller.java", "@RestController", "@Controller"],
+      "service_patterns": ["*Service.java", "@Service"],
+      "repository_patterns": ["*Repository.java", "@Repository", "JpaRepository"],
+      "query_patterns": ["EntityManager", "PreparedStatement", "@Query", "JdbcTemplate"],
+      "file_io_patterns": ["FileInputStream", "FileOutputStream", "Files."]
+    },
+    "php": {
+      "priority": 1,
+      "extensions": [".php"],
+      "frameworks": ["laravel", "symfony", "codeigniter", "wordpress", "drupal"],
+      "controller_patterns": ["*Controller.php", "Controller/"],
+      "service_patterns": ["*Service.php", "Services/"],
+      "repository_patterns": ["*Repository.php", "Repositories/"],
+      "query_patterns": ["DB::", "PDO", "mysqli", "Eloquent", "QueryBuilder"],
+      "file_io_patterns": ["file_get_contents", "fopen", "Storage::"]
+    },
+    "python": {
+      "priority": 1,
+      "extensions": [".py"],
+      "frameworks": ["django", "flask", "fastapi", "pyramid", "tornado"],
+      "controller_patterns": ["views.py", "endpoints.py", "@app.route", "@router."],
+      "service_patterns": ["services.py", "*_service.py"],
+      "repository_patterns": ["repositories.py", "models.py"],
+      "query_patterns": ["session.query", "Model.objects", "cursor.execute", "db.session"],
+      "file_io_patterns": ["open(", "Path.", "os.path"]
+    },
+    "javascript": {
+      "priority": 1,
+      "extensions": [".js", ".jsx"],
+      "frameworks": ["express", "nestjs", "koa", "hapi", "meteor"],
+      "controller_patterns": ["*Controller.js", "controllers/", "routes/"],
+      "service_patterns": ["*Service.js", "services/"],
+      "repository_patterns": ["*Repository.js", "repositories/", "models/"],
+      "query_patterns": ["sequelize", "mongoose", "knex", "connection.query"],
+      "file_io_patterns": ["fs.readFile", "fs.writeFile", "require('fs')"]
+    },
+    "typescript": {
+      "priority": 1,
+      "extensions": [".ts", ".tsx"],
+      "frameworks": ["nestjs", "express", "angular", "next"],
+      "controller_patterns": ["*Controller.ts", "@Controller", "controllers/"],
+      "service_patterns": ["*Service.ts", "@Injectable", "services/"],
+      "repository_patterns": ["*Repository.ts", "repositories/"],
+      "query_patterns": ["TypeORM", "Prisma", "Sequelize"],
+      "file_io_patterns": ["fs.promises", "readFile", "writeFile"]
+    },
+    "go": {
+      "priority": 2,
+      "extensions": [".go"],
+      "frameworks": ["gin", "echo", "fiber", "beego"],
+      "controller_patterns": ["*_handler.go", "handlers/", "*_controller.go"],
+      "service_patterns": ["*_service.go", "services/"],
+      "repository_patterns": ["*_repository.go", "repositories/", "*_store.go"],
+      "query_patterns": ["db.Query", "db.Exec", "GORM", "sqlx"],
+      "file_io_patterns": ["os.Open", "ioutil.ReadFile", "os.ReadFile"]
+    },
+    "ruby": {
+      "priority": 2,
+      "extensions": [".rb", ".erb"],
+      "frameworks": ["rails", "sinatra", "grape", "hanami"],
+      "controller_patterns": ["*_controller.rb", "controllers/"],
+      "service_patterns": ["*_service.rb", "services/"],
+      "repository_patterns": ["*_repository.rb", "models/"],
+      "query_patterns": ["ActiveRecord", ".find", ".where", "execute"],
+      "file_io_patterns": ["File.read", "File.open", "IO."]
+    },
+    "kotlin": {
+      "priority": 2,
+      "extensions": [".kt"],
+      "frameworks": ["spring-boot", "ktor", "javalin"],
+      "controller_patterns": ["*Controller.kt", "@RestController"],
+      "service_patterns": ["*Service.kt", "@Service"],
+      "repository_patterns": ["*Repository.kt", "@Repository"],
+      "query_patterns": ["EntityManager", "JdbcTemplate", "Exposed"],
+      "file_io_patterns": ["File(", "Files.", "Paths."]
+    },
+    "vbnet": {
+      "priority": 3,
+      "extensions": [".vb", ".aspx.vb"],
+      "frameworks": ["aspnet-webforms", "aspnet-mvc", "winforms"],
+      "controller_patterns": ["*.aspx.vb", "*Controller.vb"],
+      "service_patterns": ["*Service.vb"],
+      "repository_patterns": ["*Repository.vb"],
+      "query_patterns": ["SqlCommand", "SqlDataAdapter", "DataTable"],
+      "file_io_patterns": ["File.", "StreamReader", "My.Computer.FileSystem"]
+    }
+  },
+  "supported_databases": {
+    "sap_hana": {
+      "type": "sql",
+      "connection_patterns": ["HANA", "HDBODBC", "HDB"],
+      "query_languages": ["SQL", "SQLScript"]
+    },
+    "sql_server": {
+      "type": "sql",
+      "connection_patterns": ["Data Source=", "Server=", "SQLOLEDB", "SQLNCLI"],
+      "query_languages": ["T-SQL"]
+    },
+    "oracle": {
+      "type": "sql",
+      "connection_patterns": ["Oracle", "OraOLEDB", "ODP.NET"],
+      "query_languages": ["PL/SQL"]
+    },
+    "postgresql": {
+      "type": "sql",
+      "connection_patterns": ["Host=", "Npgsql", "postgresql://"],
+      "query_languages": ["SQL", "PL/pgSQL"]
+    },
+    "mysql": {
+      "type": "sql",
+      "connection_patterns": ["mysql://", "MySql.Data", "Server="],
+      "query_languages": ["SQL"]
+    },
+    "mongodb": {
+      "type": "nosql",
+      "connection_patterns": ["mongodb://", "MongoClient"],
+      "query_languages": ["MongoDB Query Language"]
+    },
+    "redis": {
+      "type": "cache",
+      "connection_patterns": ["redis://", "StackExchange.Redis", "RedisClient"],
+      "query_languages": ["Redis Commands"]
+    },
+    "db2": {
+      "type": "sql",
+      "connection_patterns": ["DB2", "IBM.Data.DB2"],
+      "query_languages": ["SQL", "PL/SQL"]
+    }
+  },
+  "file_system_patterns": {
+    "unc_paths": "\\\\\\\\[A-Za-z0-9_-]+\\\\[A-Za-z0-9_$-]+",
+    "linux_paths": "/[a-zA-Z0-9_/-]+",
+    "network_protocols": ["smb://", "ftp://", "sftp://", "nfs://"],
+    "cloud_storage": ["s3://", "azure://", "gs://"]
+  },
+  "api_patterns": {
+    "rest": ["http://", "https://", "/api/"],
+    "soap": ["<soap:", "wsdl", "asmx"],
+    "graphql": ["graphql", "/graphql"],
+    "grpc": ["grpc://", ".proto"]
+  },
+  "job_scheduler_patterns": {
+    "windows_task": ["schtasks", "Task Scheduler"],
+    "cron": ["crontab", "*/5 * * * *"],
+    "quartz": ["IJob", "Quartz.", "CronExpression"],
+    "hangfire": ["BackgroundJob", "RecurringJob"],
+    "celery": ["@task", "celery.task"],
+    "airflow": ["dag", "PythonOperator"]
+  }
+}

@@ -46,6 +46,25 @@ function log(message) {
 log("MCP Feature Replicator Server iniciando...");
 
 /**
+ * Helper: Cargar configuración de tecnologías soportadas
+ */
+function loadTechConfig() {
+  const configPath = path.join(__dirname, "tech-stack-config.json");
+  
+  try {
+    const content = fs.readFileSync(configPath, "utf8");
+    const config = JSON.parse(content);
+    log(`Tech config loaded: ${Object.keys(config.supported_languages).length} languages`);
+    return config;
+  } catch (error) {
+    log(`Warning: Could not load tech-stack-config.json: ${error.message}`);
+    return { supported_languages: {}, supported_databases: {} };
+  }
+}
+
+const TECH_CONFIG = loadTechConfig();
+
+/**
  * Helper: Cargar tech stack desde auditoría previa
  */
 function loadTechStack(repoPath) {
