@@ -1174,8 +1174,172 @@ async function analyzeJavaFeature(featureId, validFiles, repoPath, tech_stack, m
 }
 
 /**
- * Analizar feature PHP en profundidad
+ * Helper: Extraer parámetros HTTP/POST/GET de código PHP
  */
+function extractPHPParameters(content) {
+  const params = [];
+  const seen = new Set();
+  
+  // $_GET parameters
+  const getPattern = /\$_GET\s*\[\s*['"]([^'"]+)['"]\s*\]/g;
+  const getMatches = content.matchAll(getPattern);
+  for (const match of getMatches) {
+    const name = match[1];
+    if (!seen.has(name)) {
+      seen.add(name);
+      params.push({
+        name,
+        source: 'GET',
+        type: 'string',
+        description: `URL parameter: ${name}`
+      });
+    }
+  }
+  
+  // $_POST parameters
+  const postPattern = /\$_POST\s*\[\s*['"]([^'"]+)['"]\s*\]/g;
+  const postMatches = content.matchAll(postPattern);
+  for (const match of postMatches) {
+    const name = match[1];
+    if (!seen.has(name)) {
+      seen.add(name);
+      params.push({
+        name,
+        source: 'POST',
+        type: 'string',
+        description: `Form/AJAX parameter: ${name}`
+      });
+    }
+  }
+  
+  // $_SESSION parameters
+  const sessionPattern = /\$_SESSION\s*\[\s*['"]([^'"]+)['"]\s*\]/g;
+  const sessionMatches = content.matchAll(sessionPattern);
+  for (const match of sessionMatches) {
+    const name = match[1];
+    if (!seen.has(name)) {
+      seen.add(name);
+      params.push({
+        name,
+        source: 'SESSION',
+        type: 'string',
+        description: `Session variable: ${name}`
+      });
+    }
+  }
+  
+  return params;
+}
+
+/**
+ * Helper: Extraer tipo de salida de código PHP
+ */
+function extractPHPOutputType(content, fileName) {
+  const output = {
+    type: 'html',
+    description: '',
+    structure: []
+  };
+  
+  // Detectar PDF
+  if (/header\s*\(\s*['"]Content-Type:\s*application\/pdf/i.test(content) ||
+      /mpdf|dompdf|tcpdf|fpdf/i.test(content)) {
+    output.type = 'pdf';
+    output.description = 'PDF document generated dynamically';
+    
+    // Buscar secciones del PDF
+    const sectionMatches = content.matchAll(/writeHTML|Cell|MultiCell[^(]*\(['"]([^'"]{10,})['"]/g);
+    for (const match of sectionMatches) {
+      output.structure.push(match[1].substring(0, 100));
+    }
+  }
+  // Detectar JSON
+  else if (/header\s*\(\s*['"]Content-Type:\s*application\/json/i.test(content) ||
+           /json_encode/i.test(content)) {
+    output.type = 'json';
+    output.description = 'JSON response for AJAX calls';
+  }
+  // Detectar Excel
+  else if (/PHPExcel|PhpSpreadsheet|header.*excel/i.test(content)) {
+    output.type = 'excel';
+    output.description = 'Excel file (XLS/XLSX)';
+  }
+  // HTML por defecto
+  else {
+    output.type = 'html';
+    output.description = 'HTML page rendered to browser';
+  }
+  
+  return output;
+}
+
+/**
+ * Helper: Extraer flujo de proceso de código PHP
+ */
+function extractPHPProcessFlow(content) {
+  const steps = [];
+  
+  // Buscar comentarios que describen pasos
+  const commentPattern = /\/\/\s*(paso|step|[0-9]+[\.\)])\s*([^\n]+)/gi;
+  const comments = content.matchAll(commentPattern);
+  for (const match of comments) {
+    steps.push(match[2].trim());
+  }
+  
+  // Buscar secuencia de queries SQL
+  const queries = extractPHPQueries(content);
+  if (queries.length > 0) {
+    if (steps.length === 0) {
+      steps.push(`Receives parameters via HTTP request`);
+    }
+    steps.push(`Executes ${queries.length} SQL quer${queries.length > 1 ? 'ies' : 'y'} to fetch data`);
+  }
+  
+  // Detectar generación de PDF
+  if (/new\s+(mpdf|TCPDF|Dompdf)/i.test(content)) {
+    steps.push('Generates PDF document from data');
+  }
+  
+  // Detectar envío de email
+  if (/PHPMailer|mail\s*\(/i.test(content)) {
+    steps.push('Sends email notification');
+  }
+  
+  // Detectar respuesta
+  if (/echo|print|header\s*\(\s*['"]Location/i.test(content)) {
+    steps.push('Returns response to client');
+  }
+  
+  return steps.length > 0 ? steps : ['Process not yet analyzed'];
+}
+
+/**
+ * Helper: Detectar punto de entrada (menu/URL)
+ */
+function extractPHPEntryPoints(fileName, content) {
+  const entries = [];
+  
+  // Si es AJAX, el punto de entrada es via JS
+  if (fileName.toLowerCase().includes('ajax') || /\$_POST.*ajax/i.test(content)) {
+    entries.push('AJAX call from JavaScript');
+  }
+  
+  // Si tiene include/require de header, es página directa
+  if (/include.*header|require.*header/i.test(content)) {
+    entries.push(`Direct URL: /${fileName}.php`);
+  }
+  
+  // Buscar comentarios sobre menú
+  const menuPattern = /menu[:\s]+([^\n]+)/gi;
+  const menuMatches = content.matchAll(menuPattern);
+  for (const match of menuMatches) {
+    entries.push(`Menu: ${match[1].trim()}`);
+  }
+  
+  return entries.length > 0 ? entries : ['Entry point unknown'];
+}
+
+
 async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, maxDepth) {
   const allContent = [];
   const allFiles = [];
@@ -1191,29 +1355,59 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
   }
   
   const combinedContent = allContent.join('\n\n');
-  const baseName = path.basename(validFiles[0].relative, '.php').replace('Controller', '');
+  const fileName = path.basename(validFiles[0].relative, '.php');
+  const baseName = fileName.replace('Controller', '').replace('Class', '');
   
-  // Extraer todo
+  // ========= NUEVA EXTRACCIÓN RICA =========
+  
+  // 1. Extraer parámetros HTTP (GET/POST/SESSION)
+  const http_params = extractPHPParameters(combinedContent);
+  
+  // 2. Extraer tipo de salida (PDF, JSON, Excel, HTML)
+  const output_info = extractPHPOutputType(combinedContent, fileName);
+  
+  // 3. Extraer flujo de proceso (steps)
+  const process_flow = extractPHPProcessFlow(combinedContent);
+  
+  // 4. Extraer puntos de entrada (AJAX, URL, Menu)
+  const entry_points = extractPHPEntryPoints(fileName, combinedContent);
+  
+  // 5. Extraer queries SQL (como antes)
   const queries = extractPHPQueries(combinedContent);
+  
+  // 6. File system (como antes)
   const file_system = extractFilePaths(combinedContent, 'php');
+  
+  // 7. External services (como antes)
   const external_services = extractExternalAPIs(combinedContent);
+  
+  // 8. Business rules (como antes)
   const business_rules = extractBusinessRules(combinedContent, 'php');
   
-  log(`PHP Analysis: ${queries.length} queries, ${file_system.length} files, ${external_services.length} APIs`);
+  log(`PHP Rich Analysis [${baseName}]: ${http_params.length} params, ${queries.length} queries, ${process_flow.length} steps, output=${output_info.type}`);
   
-  // Data sources
+  // ========= DATA SOURCES CON ROL SEMÁNTICO =========
   const data_sources = [];
   const databases = tech_stack.databases || [];
   
   for (const query of queries) {
     const queryInfo = analyzeQuery(query);
     for (const table of queryInfo.tables) {
+      // Inferir el "role" semántico de la tabla
+      let role = `Data source: ${table}`;
+      if (query.toLowerCase().includes('insert')) role = `Crear registro en ${table}`;
+      else if (query.toLowerCase().includes('update')) role = `Actualizar datos de ${table}`;
+      else if (query.toLowerCase().includes('delete')) role = `Eliminar registro de ${table}`;
+      else if (queryInfo.filters.length > 0) role = `Consultar ${table} con filtros`;
+      else role = `Obtener datos de ${table}`;
+      
       data_sources.push({
         kind: 'database',
         engine: databases[0]?.engine || 'mysql',
         database: databases[0]?.name || 'DATABASE_NAME',
         schema: '',
         table: table,
+        role: role,  // ⭐ NUEVO CAMPO SEMÁNTICO
         columns: queryInfo.columns.length > 0 ? queryInfo.columns : ['*'],
         filters: queryInfo.filters,
         joins: queryInfo.joins,
@@ -1222,16 +1416,81 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
     }
   }
   
+  // ========= BUSINESS CONTEXT (actores, propósito) =========
+  // Inferir actores y propósito de comentarios y código
+  const actors = [];
+  if (/admin|administrador/i.test(combinedContent)) actors.push('Administrator');
+  if (/usuario|user|cliente|customer/i.test(combinedContent)) actors.push('End User');
+  if (/vendedor|seller|comercial/i.test(combinedContent)) actors.push('Salesperson');
+  
+  // Extraer propósito de comentarios
+  let purpose = `Funcionalidad: ${baseName}`;
+  const purposeMatch = combinedContent.match(/\/\*\*?\s*\*?\s*([A-Z][^\n]{20,150})/);
+  if (purposeMatch) {
+    purpose = purposeMatch[1].trim();
+  }
+  
+  const business_context = {
+    purpose: purpose,
+    actors: actors.length > 0 ? actors : ['Unknown'],
+    entry_points: entry_points
+  };
+  
+  // ========= INPUTS ESTRUCTURADOS =========
+  const inputs = {
+    http_params: http_params,
+    form_fields: [],  // TODO: extraer de HTML forms si hay
+    other_sources: []  // TODO: extraer de SESSION, COOKIES, config
+  };
+  
+  // ========= OUTPUTS ESTRUCTURADOS =========
+  const outputs = {
+    type: output_info.type,
+    description: output_info.description,
+    structure: output_info.structure
+  };
+  
+  // ========= EJEMPLO DE ESCENARIO =========
+  const example_scenarios = [];
+  if (http_params.length > 0) {
+    const exampleParams = http_params.slice(0, 3).map(p => `${p.name}=example_value`).join('&');
+    example_scenarios.push({
+      title: `Example: ${baseName} with parameters`,
+      description: `Call with: ${exampleParams}`,
+      expected_result: `Returns ${output_info.type} with data from ${data_sources.length} sources`
+    });
+  }
+  
+  // ========= RETORNAR SPEC RICA =========
   return {
     feature_id: featureId,
     name: baseName,
-    domain_purpose: `Funcionalidad PHP: ${baseName}`,
-    inputs: [],
-    outputs: [{ type: 'Response', description: 'HTTP response' }],
+    domain_purpose: purpose,
+    
+    // NUEVO: contexto de negocio
+    business_context: business_context,
+    
+    // NUEVO: inputs estructurados
+    inputs: inputs,
+    
+    // NUEVO: outputs estructurados
+    outputs: outputs,
+    
+    // NUEVO: flujo de proceso
+    process_flow: process_flow,
+    
+    // MEJORADO: data sources con "role"
     data_sources,
+    
     file_system,
     external_services,
+    
+    // business_rules (como antes)
     business_rules,
+    
+    // NUEVO: escenarios de ejemplo
+    example_scenarios: example_scenarios,
+    
     files_involved: allFiles,
     tech_stack
   };
@@ -1520,32 +1779,63 @@ async function exportFeatureMarkdown(args) {
     
     const filePath = path.join(output_path, fileName);
     
-    // Generar contenido Markdown
+    // Generar contenido Markdown RICO con todas las secciones
     const md = `# ${feature_spec.name || "Funcionalidad"}
 
 **ID:** ${feature_spec.feature_id || "N/A"}
 
 ---
 
-## 📋 Propósito de negocio
+## 📋 Contexto de negocio
 
-${feature_spec.domain_purpose || "Sin descripción disponible"}
+**Propósito:** ${feature_spec.business_context?.purpose || feature_spec.domain_purpose || "Sin descripción disponible"}
+
+**Actores:** ${feature_spec.business_context?.actors ? feature_spec.business_context.actors.join(", ") : "No especificados"}
+
+**Puntos de entrada:**
+${feature_spec.business_context?.entry_points && feature_spec.business_context.entry_points.length > 0
+  ? feature_spec.business_context.entry_points.map(ep => `- ${ep}`).join("\n")
+  : "- No especificados"}
 
 ---
 
 ## 📥 Entradas
 
-${feature_spec.inputs && feature_spec.inputs.length > 0 
-  ? feature_spec.inputs.map(inp => `- **${inp.name}** (${inp.type}): ${inp.description || "Sin descripción"}`).join("\n")
-  : "Sin entradas definidas"}
+### Parámetros HTTP
+${feature_spec.inputs?.http_params && feature_spec.inputs.http_params.length > 0
+  ? feature_spec.inputs.http_params.map(p => `- **${p.name}** (${p.source}): ${p.description || "Sin descripción"}`).join("\n")
+  : "Sin parámetros HTTP definidos"}
+
+### Campos de formulario
+${feature_spec.inputs?.form_fields && feature_spec.inputs.form_fields.length > 0
+  ? feature_spec.inputs.form_fields.map(f => `- **${f.name}**: ${f.description}`).join("\n")
+  : "Sin campos de formulario definidos"}
+
+### Otras fuentes de datos
+${feature_spec.inputs?.other_sources && feature_spec.inputs.other_sources.length > 0
+  ? feature_spec.inputs.other_sources.map(s => `- ${s}`).join("\n")
+  : "Sin otras fuentes de entrada"}
 
 ---
 
 ## 📤 Salidas
 
-${feature_spec.outputs && feature_spec.outputs.length > 0
-  ? feature_spec.outputs.map(out => `- **Tipo:** ${out.type}\n  - ${out.description || "Sin descripción"}`).join("\n\n")
-  : "Sin salidas definidas"}
+**Tipo de salida:** ${feature_spec.outputs?.type || "No especificado"}
+
+**Descripción:** ${feature_spec.outputs?.description || "Sin descripción"}
+
+${feature_spec.outputs?.structure && feature_spec.outputs.structure.length > 0 ? `
+**Estructura:**
+${feature_spec.outputs.structure.map(s => `- ${s}`).join("\n")}
+` : ""}
+
+---
+
+## 🔄 Flujo de proceso
+
+${feature_spec.process_flow && feature_spec.process_flow.length > 0
+  ? feature_spec.process_flow.map((step, i) => `${i + 1}. ${step}`).join("\n")
+  : "Flujo no documentado"}
 
 ---
 
@@ -1553,7 +1843,11 @@ ${feature_spec.outputs && feature_spec.outputs.length > 0
 
 ${feature_spec.data_sources && feature_spec.data_sources.length > 0
   ? feature_spec.data_sources.map(ds => `
-### ${ds.engine} - ${ds.database || "N/A"}.${ds.schema || "N/A"}.${ds.table}
+### ${ds.table}
+
+**Rol:** ${ds.role || "Sin especificar"}
+
+**Motor:** ${ds.engine} | **Base de datos:** ${ds.database || "N/A"}
 
 **Columnas:** ${ds.columns ? ds.columns.join(", ") : "N/A"}
 
@@ -1563,6 +1857,14 @@ ${ds.joins ? `**Joins:** \`${ds.joins}\`` : ""}
 ${ds.source_code_snippet ? `**Query:**\n\`\`\`sql\n${ds.source_code_snippet}\n\`\`\`` : ""}
   `).join("\n---\n")
   : "Sin fuentes de datos definidas"}
+
+---
+
+## ⚖️ Reglas de negocio
+
+${feature_spec.business_rules && feature_spec.business_rules.length > 0
+  ? feature_spec.business_rules.map(rule => `- ${rule}`).join("\n")
+  : "Sin reglas de negocio documentadas"}
 
 ---
 
@@ -1593,11 +1895,17 @@ ${svc.payload_example ? `**Payload de ejemplo:**\n\`\`\`json\n${svc.payload_exam
 
 ---
 
-## ⚖️ Reglas de negocio
+## 🎯 Escenarios de ejemplo
 
-${feature_spec.business_rules && feature_spec.business_rules.length > 0
-  ? feature_spec.business_rules.map(rule => `- ${rule}`).join("\n")
-  : "Sin reglas de negocio documentadas"}
+${feature_spec.example_scenarios && feature_spec.example_scenarios.length > 0
+  ? feature_spec.example_scenarios.map(scenario => `
+### ${scenario.title}
+
+**Descripción:** ${scenario.description}
+
+**Resultado esperado:** ${scenario.expected_result}
+  `).join("\n---\n")
+  : "Sin escenarios de ejemplo"}
 
 ---
 
@@ -1619,7 +1927,7 @@ ${feature_spec.tech_stack ? `
 
 ---
 
-*Documento generado automáticamente por feature-replicator MCP*
+*Documento generado automáticamente por feature-replicator MCP v2.1 (Rich Specs)*
 `;
     
     // Escribir archivo
