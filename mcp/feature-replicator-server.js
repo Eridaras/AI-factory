@@ -639,9 +639,15 @@ async function detectFeatures(repoPath, tech_stack, maxFiles) {
   
   // Buscar archivos con las extensiones del lenguaje
   const extensions = langConfig.extensions || [];
-  const files = findFiles(repoPath, extensions, maxFiles);
+  const filePaths = findFiles(repoPath, extensions, maxFiles);
   
-  log(`Found ${files.length} files with extensions: ${extensions.join(', ')}`);
+  log(`Found ${filePaths.length} files with extensions: ${extensions.join(', ')}`);
+  
+  // Convertir paths a objetos con full y relative
+  const files = filePaths.map(fullPath => ({
+    full: fullPath,
+    relative: path.relative(repoPath, fullPath)
+  }));
   
   // Detectar features según el lenguaje
   let features = [];
