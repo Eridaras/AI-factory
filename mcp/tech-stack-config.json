@@ -162,5 +162,82 @@
     "hangfire": ["BackgroundJob", "RecurringJob"],
     "celery": ["@task", "celery.task"],
     "airflow": ["dag", "PythonOperator"]
+  },
+  "legacy_php_b2b": {
+    "feature_purposes": {
+      "CERTIFICADO-COMERCIAL": "Generar certificado comercial (PDF o documento) para clientes/distribuidores con datos de cliente, forma de pago, cupo y descuentos.",
+      "CERTIFICADO-RAPPEL": "Generar certificado/reporte de rappel (bonificación por volumen de ventas) con cálculo de comisiones y periodo.",
+      "CATALOGO-MARKETING": "Exponer un catálogo digital de documentos de marketing (PDF, imágenes, fichas técnicas) organizados por categorías.",
+      "CARTERA": "Gestionar cartera de clientes y facturas pendientes con estados y montos.",
+      "COBROS": "Registrar y consultar cobros de facturas con fechas y formas de pago.",
+      "PEDIDOS": "Gestionar pedidos de clientes con productos, cantidades y precios.",
+      "REPORTES": "Generar reportes y dashboards con datos de ventas, clientes y productos."
+    },
+    "param_meanings": {
+      "target_clnt_id": "ID del cliente objetivo a certificar (CLNT_ID destino del certificado).",
+      "sales_clnt_id": "ID del cliente usado para leer datos de ventas y forma de pago.",
+      "param": "Tipo de acción o subacción a ejecutar (ej: 'certificado_comercial', 'certificado_rappel').",
+      "texto": "Texto de búsqueda para filtrar archivos del catálogo por nombre.",
+      "anio": "Año del período de rappel a calcular.",
+      "mes": "Mes del período de rappel a calcular.",
+      "fecha_desde": "Fecha inicio del rango para consultas de facturas/pedidos.",
+      "fecha_hasta": "Fecha fin del rango para consultas de facturas/pedidos.",
+      "idInterlocutor": "ID del cliente o interlocutor comercial (SAP ID).",
+      "idCliente": "ID del cliente en el sistema B2B.",
+      "idUsuario": "ID del usuario que ejecuta la acción.",
+      "categoria": "Categoría del catálogo (CAT/CV/MP/FDP/FOT).",
+      "archivo": "Nombre o ruta del archivo a descargar/visualizar."
+    },
+    "catalog_categories": {
+      "CAT": "Catálogos de productos generales",
+      "CV": "Cartas de Venta y ofertas comerciales",
+      "MP": "Material Promocional (banners, folletos, etc.)",
+      "FDP": "Fichas de Producto con especificaciones técnicas",
+      "FOT": "Fotos de productos en alta resolución"
+    },
+    "business_logic_patterns": {
+      "rappel_calculation": {
+        "pattern": "(ventas|monto|total).*\\*.*(%|porcentaje|factor)",
+        "description": "Cálculo de rappel como porcentaje de ventas totales"
+      },
+      "date_range_filter": {
+        "pattern": "WHERE.*fecha.*BETWEEN.*AND|WHERE.*fecha.*>=.*AND.*fecha.*<=",
+        "description": "Filtro de registros por rango de fechas"
+      },
+      "status_validation": {
+        "pattern": "WHERE.*estado.*=|IF.*estado.*==",
+        "description": "Validación de estado de pedidos/facturas (CERRADO, PENDIENTE, etc.)"
+      },
+      "discount_application": {
+        "pattern": "tipo.*descuento|dsct.*tipo|descuento.*percentual|descuento.*fijo",
+        "description": "Aplicación de descuentos según tipo (PERCENTUAL o FIJO)"
+      }
+    },
+    "query_block_patterns": {
+      "customer_data": {
+        "tables": ["v_SAP_B2B_RELACION_INTERLOCUTORES", "SAPB2BINTERLOCUTORES", "CLIENTE"],
+        "description": "Obtener datos del cliente (nombre, dirección, contacto, cupo)"
+      },
+      "payment_info": {
+        "tables": ["CLIENTE_FORMA_PAGO", "FORMA_PAGO"],
+        "description": "Consultar forma de pago del cliente (efectivo, crédito, plazo)"
+      },
+      "user_info": {
+        "tables": ["USUARIO", "CLIENTE.*JOIN.*USUARIO"],
+        "description": "Obtener datos del usuario o vendedor asignado"
+      },
+      "sales_history": {
+        "tables": ["PEDIDO", "FACTURA", "VENTAS"],
+        "description": "Consultar historial de ventas, pedidos o facturas"
+      },
+      "product_info": {
+        "tables": ["PRODUCTO", "ARTICULO", "SAP.*MATERIAL"],
+        "description": "Obtener información de productos o artículos"
+      },
+      "rappel_data": {
+        "tables": ["RAPPEL", "COMISION", "BONIFICACION"],
+        "description": "Consultar datos de rappel, comisiones o bonificaciones"
+      }
+    }
   }
 }

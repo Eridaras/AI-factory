@@ -1174,11 +1174,14 @@ async function analyzeJavaFeature(featureId, validFiles, repoPath, tech_stack, m
 }
 
 /**
- * Helper: Extraer parámetros HTTP/POST/GET de código PHP
+ * Helper: Extraer parámetros HTTP/POST/GET de código PHP con significado de negocio
  */
 function extractPHPParameters(content) {
   const params = [];
   const seen = new Set();
+  
+  // Cargar mapeo de significados desde config
+  const paramMeanings = TECH_CONFIG.legacy_php_b2b?.param_meanings || {};
   
   // $_GET parameters
   const getPattern = /\$_GET\s*\[\s*['"]([^'"]+)['"]\s*\]/g;
@@ -1191,7 +1194,7 @@ function extractPHPParameters(content) {
         name,
         source: 'GET',
         type: 'string',
-        description: `URL parameter: ${name}`
+        description: paramMeanings[name] || `URL parameter: ${name}`
       });
     }
   }
@@ -1207,7 +1210,7 @@ function extractPHPParameters(content) {
         name,
         source: 'POST',
         type: 'string',
-        description: `Form/AJAX parameter: ${name}`
+        description: paramMeanings[name] || `Form/AJAX parameter: ${name}`
       });
     }
   }
@@ -1223,7 +1226,7 @@ function extractPHPParameters(content) {
         name,
         source: 'SESSION',
         type: 'string',
-        description: `Session variable: ${name}`
+        description: paramMeanings[name] || `Session variable: ${name}`
       });
     }
   }
@@ -1276,6 +1279,128 @@ function extractPHPOutputType(content, fileName) {
 /**
  * Helper: Extraer flujo de proceso de código PHP
  */
+/**
+ * Helper: Agrupar queries SQL en bloques lógicos de negocio
+ */
+function groupQueriesByPurpose(queries) {
+  const blocks = [];
+  const queryBlockPatterns = TECH_CONFIG.legacy_php_b2b?.query_block_patterns || {};
+  
+  for (const query of queries) {
+    const queryUpper = query.toUpperCase();
+    let matched = false;
+    
+    // Intentar clasificar query en un bloque existente
+    for (const [blockKey, blockConfig] of Object.entries(queryBlockPatterns)) {
+      for (const table of blockConfig.tables) {
+        if (new RegExp(table, 'i').test(queryUpper)) {
+          // Buscar si ya existe un bloque de este tipo
+          let existingBlock = blocks.find(b => b.type === blockKey);
+          if (!existingBlock) {
+            existingBlock = {
+              type: blockKey,
+              description: blockConfig.description,
+              query_count: 0
+            };
+            blocks.push(existingBlock);
+          }
+          existingBlock.query_count++;
+          matched = true;
+          break;
+        }
+      }
+      if (matched) break;
+    }
+    
+    // Si no coincide con ningún patrón, crear bloque genérico
+    if (!matched) {
+      let genericBlock = blocks.find(b => b.type === 'other');
+      if (!genericBlock) {
+        genericBlock = {
+          type: 'other',
+          description: 'Other database operations',
+          query_count: 0
+        };
+        blocks.push(genericBlock);
+      }
+      genericBlock.query_count++;
+    }
+  }
+  
+  return blocks;
+}
+
+/**
+ * Helper: Extraer lógica de negocio real (cálculos, validaciones)
+ */
+function extractBusinessLogic(content) {
+  const logic = [];
+  const patterns = TECH_CONFIG.legacy_php_b2b?.business_logic_patterns || {};
+  
+  // Detectar cálculos de rappel
+  if (patterns.rappel_calculation) {
+    const rappelPattern = new RegExp(patterns.rappel_calculation.pattern, 'gi');
+    if (rappelPattern.test(content)) {
+      logic.push({
+        type: 'calculation',
+        description: 'Cálculo de rappel como porcentaje o factor de ventas totales',
+        detail: 'rappel = ventas * porcentaje / 100'
+      });
+    }
+  }
+  
+  // Detectar filtros de fecha
+  if (patterns.date_range_filter) {
+    const datePattern = new RegExp(patterns.date_range_filter.pattern, 'gi');
+    const dateMatches = content.match(datePattern);
+    if (dateMatches && dateMatches.length > 0) {
+      logic.push({
+        type: 'filter',
+        description: `Filtrar registros por rango de fechas (${dateMatches.length} filtros detectados)`,
+        detail: 'WHERE fecha BETWEEN fecha_desde AND fecha_hasta'
+      });
+    }
+  }
+  
+  // Detectar validaciones de estado
+  if (patterns.status_validation) {
+    const statusPattern = new RegExp(patterns.status_validation.pattern, 'gi');
+    const statusMatches = content.match(statusPattern);
+    if (statusMatches && statusMatches.length > 0) {
+      logic.push({
+        type: 'validation',
+        description: 'Validar estado de registros (CERRADO, PENDIENTE, ANULADO, etc.)',
+        detail: statusMatches[0].substring(0, 100)
+      });
+    }
+  }
+  
+  // Detectar aplicación de descuentos
+  if (patterns.discount_application) {
+    const discountPattern = new RegExp(patterns.discount_application.pattern, 'gi');
+    if (discountPattern.test(content)) {
+      logic.push({
+        type: 'calculation',
+        description: 'Aplicar descuentos según tipo (PERCENTUAL o FIJO)',
+        detail: 'if (tipo_dsct == "PERCENTUAL") descuento = monto * % else descuento = valor_fijo'
+      });
+    }
+  }
+  
+  // Detectar validaciones con if/switch explícitas
+  const ifPattern = /if\s*\(\s*\$[a-zA-Z_]+\s*[=!<>]+\s*[^)]+\)\s*{/g;
+  const ifMatches = content.match(ifPattern);
+  if (ifMatches && ifMatches.length > 5) {
+    logic.push({
+      type: 'validation',
+      description: `Múltiples validaciones de negocio (${ifMatches.length} condiciones detectadas)`,
+      detail: 'Validaciones de parámetros, estados, permisos, etc.'
+    });
+  }
+  
+  return logic;
+}
+
 function extractPHPProcessFlow(content) {
   const steps = [];
   
@@ -1286,28 +1411,35 @@ function extractPHPProcessFlow(content) {
     steps.push(match[2].trim());
   }
   
-  // Buscar secuencia de queries SQL
+  // Agrupar queries en bloques lógicos en lugar de solo contar
   const queries = extractPHPQueries(content);
   if (queries.length > 0) {
     if (steps.length === 0) {
-      steps.push(`Receives parameters via HTTP request`);
+      steps.push(`Receive and validate HTTP parameters`);
     }
-    steps.push(`Executes ${queries.length} SQL quer${queries.length > 1 ? 'ies' : 'y'} to fetch data`);
+    
+    // Agrupar queries por propósito
+    const queryBlocks = groupQueriesByPurpose(queries);
+    for (const block of queryBlocks) {
+      steps.push(`${block.description} (${block.query_count} quer${block.query_count > 1 ? 'ies' : 'y'})`);
+    }
   }
   
   // Detectar generación de PDF
   if (/new\s+(mpdf|TCPDF|Dompdf)/i.test(content)) {
-    steps.push('Generates PDF document from data');
+    steps.push('Generate PDF document from data and template');
   }
   
   // Detectar envío de email
   if (/PHPMailer|mail\s*\(/i.test(content)) {
-    steps.push('Sends email notification');
+    steps.push('Send email notification with PDF attachment');
   }
   
-  // Detectar respuesta
-  if (/echo|print|header\s*\(\s*['"]Location/i.test(content)) {
-    steps.push('Returns response to client');
+  // Detectar respuesta JSON
+  if (/json_encode|header.*application\/json/i.test(content)) {
+    steps.push('Return JSON response to client');
+  } else if (/echo|print|header\s*\(\s*['"]Location/i.test(content)) {
+    steps.push('Return response to client');
   }
   
   return steps.length > 0 ? steps : ['Process not yet analyzed'];
@@ -1416,19 +1548,32 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
     }
   }
   
-  // ========= BUSINESS CONTEXT (actores, propósito) =========
-  // Inferir actores y propósito de comentarios y código
+  // ========= BUSINESS CONTEXT CON PROPÓSITO REAL =========
+  // Inferir propósito desde feature_id primero
+  const featurePurposes = TECH_CONFIG.legacy_php_b2b?.feature_purposes || {};
+  let purpose = `Funcionalidad: ${baseName}`;
+  
+  // Buscar propósito por feature_id (ej: CERTIFICADO-COMERCIAL)
+  for (const [key, purposeText] of Object.entries(featurePurposes)) {
+    if (featureId.toUpperCase().includes(key)) {
+      purpose = purposeText;
+      break;
+    }
+  }
+  
+  // Si no hay match, intentar extraer de comentarios
+  if (purpose === `Funcionalidad: ${baseName}`) {
+    const purposeMatch = combinedContent.match(/\/\*\*?\s*\*?\s*([A-Z][^\n]{20,150})/);
+    if (purposeMatch) {
+      purpose = purposeMatch[1].trim();
+    }
+  }
+  
+  // Inferir actores de código
   const actors = [];
   if (/admin|administrador/i.test(combinedContent)) actors.push('Administrator');
   if (/usuario|user|cliente|customer/i.test(combinedContent)) actors.push('End User');
   if (/vendedor|seller|comercial/i.test(combinedContent)) actors.push('Salesperson');
-  
-  // Extraer propósito de comentarios
-  let purpose = `Funcionalidad: ${baseName}`;
-  const purposeMatch = combinedContent.match(/\/\*\*?\s*\*?\s*([A-Z][^\n]{20,150})/);
-  if (purposeMatch) {
-    purpose = purposeMatch[1].trim();
-  }
   
   const business_context = {
     purpose: purpose,
@@ -1449,6 +1594,26 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
     description: output_info.description,
     structure: output_info.structure
   };
+  
+  // ========= LÓGICA DE NEGOCIO (cálculos, validaciones) =========
+  const business_logic = extractBusinessLogic(combinedContent);
+  
+  // Combinar business_rules existentes con lógica extraída
+  const enriched_business_rules = [...business_rules];
+  for (const logic of business_logic) {
+    enriched_business_rules.push(`[${logic.type.toUpperCase()}] ${logic.description}: ${logic.detail}`);
+  }
+  
+  // ========= ESTRUCTURA DE CATÁLOGO (si aplica) =========
+  const catalog_info = [];
+  const catalogCategories = TECH_CONFIG.legacy_php_b2b?.catalog_categories || {};
+  
+  // Detectar si es catálogo por rutas de archivos
+  for (const [category, description] of Object.entries(catalogCategories)) {
+    if (new RegExp(`/${category}/`, 'i').test(combinedContent)) {
+      catalog_info.push(`**${category}**: ${description}`);
+    }
+  }
   
   // ========= EJEMPLO DE ESCENARIO =========
   const example_scenarios = [];
@@ -1476,13 +1641,20 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
     // NUEVO: outputs estructurados
     outputs: outputs,
     
-    // NUEVO: flujo de proceso
+    // NUEVO: flujo de proceso con bloques lógicos
     process_flow: process_flow,
     
     // MEJORADO: data sources con "role"
     data_sources,
     
     file_system,
+    external_services,
+    
+    // MEJORADO: business_rules con lógica de negocio
+    business_rules: enriched_business_rules,
+    
+    // NUEVO: información de catálogo (si aplica)
+    catalog_structure: catalog_info.length > 0 ? catalog_info : null,
     external_services,
     
     // business_rules (como antes)
@@ -1867,6 +2039,17 @@ ${feature_spec.business_rules && feature_spec.business_rules.length > 0
   : "Sin reglas de negocio documentadas"}
 
 ---
+
+${feature_spec.catalog_structure ? `
+## 📂 Estructura de Catálogo
+
+Este componente gestiona un catálogo digital organizado en las siguientes categorías:
+
+${feature_spec.catalog_structure.join("\n")}
+
+---
+
+` : ""}
 
 ## 📁 Sistema de archivos
 
