@@ -21,13 +21,14 @@ import {
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { analyzeCode } from "./ast-analyzer.js";
 
 // Obtener __dirname en ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuración de logging
-const LOG_FILE = path.join(__dirname, "feature-replicator.log");
+const LOG_FILE = path.join(__dirname, "logs", "feature-replicator.log");
 
 /**
  * Logger para el servidor MCP
@@ -1490,6 +1491,15 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
   const fileName = path.basename(validFiles[0].relative, '.php');
   const baseName = fileName.replace('Controller', '').replace('Class', '');
   
+  // ========= AST DEEP ANALYSIS (v3.0) =========
+  let ast_analysis = null;
+  try {
+    ast_analysis = await analyzeCode(combinedContent, 'php');
+    log(`AST Analysis [${baseName}]: ${ast_analysis.validations.length} validations, ${ast_analysis.calculations.length} calculations, ${ast_analysis.error_handling.length} error handlers`);
+  } catch (error) {
+    log(`AST Analysis failed for ${baseName}: ${error.message}`);
+  }
+  
   // ========= NUEVA EXTRACCIÓN RICA =========
   
   // 1. Extraer parámetros HTTP (GET/POST/SESSION)
@@ -1626,7 +1636,7 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
     });
   }
   
-  // ========= RETORNAR SPEC RICA =========
+  // ========= RETORNAR SPEC RICA CON AST ANALYSIS =========
   return {
     feature_id: featureId,
     name: baseName,
@@ -1655,13 +1665,41 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
     
     // NUEVO: información de catálogo (si aplica)
     catalog_structure: catalog_info.length > 0 ? catalog_info : null,
-    external_services,
-    
-    // business_rules (como antes)
-    business_rules,
     
     // NUEVO: escenarios de ejemplo
     example_scenarios: example_scenarios,
+    
+    // ========= AST DEEP ANALYSIS (v3.0) =========
+    deep_analysis: ast_analysis ? {
+      validations: ast_analysis.validations.map(v => ({
+        type: v.type,
+        condition: v.condition,
+        action: v.then || v.cases?.map(c => `${c.value}: ${c.action}`).join('; '),
+        line: v.line,
+        complexity: v.complexity
+      })),
+      calculations: ast_analysis.calculations.map(c => ({
+        variable: c.variable,
+        formula: c.formula,
+        operations: c.operations,
+        line: c.line
+      })),
+      error_handling: ast_analysis.error_handling.map(e => ({
+        type: e.type,
+        details: e.exception || e.catches?.map(c => `catch ${c.exception_type}: ${c.handler}`).join('; '),
+        line: e.line
+      })),
+      state_transitions: ast_analysis.state_transitions,
+      function_dependencies: ast_analysis.function_calls.filter(fc => 
+        !fc.function.includes('mysql_') && 
+        !fc.function.includes('echo') && 
+        !fc.function.includes('print')
+      ).map(fc => ({
+        function: fc.function,
+        arguments_count: fc.arguments.length,
+        line: fc.line
+      }))
+    } : null,
     
     files_involved: allFiles,
     tech_stack
@@ -2092,6 +2130,60 @@ ${feature_spec.example_scenarios && feature_spec.example_scenarios.length > 0
 
 ---
 
+${feature_spec.deep_analysis ? `
+## 🔬 Análisis profundo (AST)
+
+### Validaciones de negocio
+
+${feature_spec.deep_analysis.validations && feature_spec.deep_analysis.validations.length > 0
+  ? feature_spec.deep_analysis.validations.map(v => `
+#### ${v.type.toUpperCase()} (línea ${v.line})
+
+**Condición:** \`${v.condition}\`
+
+**Acción:** ${v.action}
+
+${v.complexity > 0 ? `**Complejidad:** ${v.complexity} operadores lógicos` : ""}
+  `).join("\n")
+  : "Sin validaciones detectadas"}
+
+### Cálculos exactos
+
+${feature_spec.deep_analysis.calculations && feature_spec.deep_analysis.calculations.length > 0
+  ? feature_spec.deep_analysis.calculations.map(c => `
+- **${c.variable}** = \`${c.formula}\` (línea ${c.line})
+  - Operaciones: ${c.operations.join(', ')}
+  `).join("\n")
+  : "Sin cálculos detectados"}
+
+### Manejo de errores
+
+${feature_spec.deep_analysis.error_handling && feature_spec.deep_analysis.error_handling.length > 0
+  ? feature_spec.deep_analysis.error_handling.map(e => `
+- **${e.type}** (línea ${e.line}): ${e.details}
+  `).join("\n")
+  : "Sin manejo de errores explícito"}
+
+### Transiciones de estado
+
+${feature_spec.deep_analysis.state_transitions && feature_spec.deep_analysis.state_transitions.length > 0
+  ? feature_spec.deep_analysis.state_transitions.map(t => `
+- **${t.field}** → \`${t.new_value}\` (línea ${t.line})
+  `).join("\n")
+  : "Sin transiciones de estado detectadas"}
+
+### Dependencias de funciones
+
+${feature_spec.deep_analysis.function_dependencies && feature_spec.deep_analysis.function_dependencies.length > 0
+  ? feature_spec.deep_analysis.function_dependencies.slice(0, 10).map(f => `
+- \`${f.function}\` con ${f.arguments_count} argumentos (línea ${f.line})
+  `).join("\n") + (feature_spec.deep_analysis.function_dependencies.length > 10 ? `\n- ... y ${feature_spec.deep_analysis.function_dependencies.length - 10} más` : "")
+  : "Sin dependencias de funciones detectadas"}
+
+---
+
+` : ""}
+
 ## 📄 Archivos involucrados
 
 ${feature_spec.files_involved && feature_spec.files_involved.length > 0
@@ -2110,7 +2202,7 @@ ${feature_spec.tech_stack ? `
 
 ---
 
-*Documento generado automáticamente por feature-replicator MCP v2.2 (Business Semantics)*
+*Documento generado automáticamente por feature-replicator MCP v3.0 (Deep Analysis Engine)*
 `;
     
     // Escribir archivo
