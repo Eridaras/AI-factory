@@ -1701,6 +1701,42 @@ async function analyzePHPFeature(featureId, validFiles, repoPath, tech_stack, ma
       }))
     } : null,
     
+    // ========= METADATA DE CONFIANZA (v3.0) =========
+    confidence_metadata: {
+      extraction_method: ast_analysis ? 'AST + Patterns' : 'Regex Patterns only',
+      confidence_level: ast_analysis ? 'HIGH' : 'MEDIUM',
+      reliable_data: {
+        validations: ast_analysis ? true : false,
+        calculations: ast_analysis ? true : false,
+        error_handling: ast_analysis ? true : false,
+        queries: true,
+        http_params: true
+      },
+      inferred_data: {
+        business_purpose: !purpose.includes('Funcionalidad:'),
+        param_meanings: http_params.some(p => !p.description.includes('Form parameter') && !p.description.includes('URL parameter')),
+        data_source_roles: true,
+        process_flow_grouping: true
+      },
+      missing_data: [
+        'Business values meaning (why $monto > 1000?)',
+        'Constants and config values',
+        'Stored procedures internal logic',
+        'Cross-file function implementations',
+        'Database foreign keys and constraints',
+        'Implicit business rules not in code',
+        'Edge cases not documented'
+      ],
+      recommendations: [
+        'Use AST validations and formulas as-is (100% accurate)',
+        'Verify business purpose with stakeholders',
+        'Check stored procedures manually',
+        'Review config files and constants',
+        'Test with real legacy data',
+        'Validate edge cases with end users'
+      ]
+    },
+    
     files_involved: allFiles,
     tech_stack
   };
@@ -2202,7 +2238,89 @@ ${feature_spec.tech_stack ? `
 
 ---
 
+## ⚠️ Limitaciones y nivel de confianza
+
+### ✅ Datos 100% fieles al código (extraídos por AST)
+
+Estos datos fueron extraídos directamente del código fuente mediante análisis sintáctico:
+
+${feature_spec.deep_analysis ? `
+- **Validaciones**: ${feature_spec.deep_analysis.validations.length} condiciones IF/SWITCH con lógica completa
+- **Cálculos**: ${feature_spec.deep_analysis.calculations.length} fórmulas exactas con todas las operaciones
+- **Manejo de errores**: ${feature_spec.deep_analysis.error_handling.length} bloques try/catch documentados
+- **Transiciones de estado**: ${feature_spec.deep_analysis.state_transitions.length} cambios de estado detectados
+- **Queries SQL**: ${feature_spec.data_sources.length} queries extraídas literalmente del código
+` : `
+- **Queries SQL**: ${feature_spec.data_sources.length} queries extraídas literalmente del código
+- **Parámetros HTTP**: ${feature_spec.inputs?.http_params?.length || 0} parámetros detectados
+`}
+
+### ⚠️ Datos inferidos o asumidos (pueden necesitar validación)
+
+Estos datos fueron inferidos usando mapas de patrones y heurísticas:
+
+- **Propósito de negocio**: ${feature_spec.business_context?.purpose?.includes('Funcionalidad:') ? '❌ Genérico (no se encontró coincidencia en mapas)' : '✅ Mapeado desde feature_id'}
+- **Significado de parámetros**: ${feature_spec.inputs?.http_params?.some(p => p.description.includes('Form parameter') || p.description.includes('URL parameter')) ? '⚠️ Algunos parámetros sin significado de negocio' : '✅ Todos los parámetros tienen significado mapeado'}
+- **Rol de data sources**: ⚠️ Inferido desde tipo de query y nombre de tabla
+- **Flujo de proceso**: ⚠️ Agrupado por patrones de queries, puede faltar contexto
+- **Business rules**: ⚠️ Detectadas por patrones, descripciones son genéricas
+
+### ❌ Datos NO extraídos (requieren análisis adicional)
+
+**Información que NO está capturada actualmente:**
+
+1. **Significado de valores de negocio**
+   - ¿Por qué $monto > 1000? ¿Es un límite, un threshold?
+   - ¿Qué significa "CERRADO", "PENDIENTE" en el contexto del negocio?
+
+2. **Constantes y configuraciones**
+   - Valores en config.php, defines, constantes
+   - Variables de entorno
+
+3. **Lógica en stored procedures**
+   - Si hay \`EXEC sp_calcular_rappel\`, NO sabemos qué hace internamente
+   - Triggers y procedimientos de BD no documentados
+
+4. **Funciones en otros archivos**
+   - Si llama a \`guardar_pedido()\` definida en otro archivo, NO sabemos su implementación
+   - Dependencias cross-file limitadas
+
+5. **Contexto de negocio implícito**
+   - Reglas no escritas en código
+   - Casos edge no documentados
+   - Excepciones del dominio
+
+6. **Relaciones entre tablas**
+   - Foreign keys (requiere Layer 2: DB Reverse Engineering)
+   - Constraints y validaciones de BD
+   - Integridad referencial
+
+### 📋 Recomendaciones para replicación
+
+**Antes de implementar:**
+1. ✅ Usar validaciones y cálculos del AST como base (son 100% fieles)
+2. ⚠️ Revisar propósito y contexto de negocio con stakeholders
+3. ⚠️ Validar significados de parámetros con usuarios del sistema
+4. ❌ Investigar stored procedures manualmente
+5. ❌ Revisar archivos de configuración y constantes
+6. ❌ Consultar casos edge con usuarios finales
+
+**Durante implementación:**
+- Las fórmulas de cálculo son exactas, úsalas tal cual
+- Las validaciones IF son completas, replícalas literalmente
+- Los roles de data sources son inferidos, verifica con el esquema real
+- El flujo de proceso es aproximado, puede faltar pasos ocultos
+
+**Después de implementar:**
+- Prueba con datos reales del legacy
+- Compara outputs (especialmente PDFs, reportes)
+- Valida casos edge con usuarios
+
+---
+
 *Documento generado automáticamente por feature-replicator MCP v3.0 (Deep Analysis Engine)*
+
+**Nivel de confianza global:** ${feature_spec.deep_analysis ? '🟢 ALTO (AST disponible)' : '🟡 MEDIO (solo regex patterns)'}
 `;
     
     // Escribir archivo
