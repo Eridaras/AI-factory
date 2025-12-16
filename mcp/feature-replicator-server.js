@@ -335,12 +335,14 @@ function detectPHPFeatures(repoPath, files) {
   for (const file of phpFiles) {
     if (file.relative.includes('CAPA_LOGICA/') || file.relative.includes('capa_logica/')) {
       const fileName = path.basename(file.relative, '.php');
+      log(`[DEBUG] Checking CAPA_LOGICA file: ${fileName} (relative: ${file.relative})`);
       // Detectar archivos que terminan en "Class" o contienen clases
       if (fileName.toLowerCase().includes('class') || fileName.toLowerCase().includes('service')) {
         try {
           const content = fs.readFileSync(file.full, 'utf8');
           // Si el archivo contiene al menos una definición de clase
           if (/class\s+\w+/.test(content)) {
+            log(`[DEBUG] Found class definition in: ${fileName}`);
             features.push({
               id: `php-legacy-logic-${fileName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
               type: 'business_logic',
@@ -348,10 +350,14 @@ function detectPHPFeatures(repoPath, files) {
               files: [file.relative],
               description: `Legacy Business Logic: ${fileName}`
             });
+          } else {
+            log(`[DEBUG] No class definition found in: ${fileName}`);
           }
         } catch (error) {
           log(`Error reading ${file.full}: ${error.message}`);
         }
+      } else {
+        log(`[DEBUG] Filename doesn't match pattern: ${fileName}`);
       }
     }
   }
