@@ -1,255 +1,201 @@
-# 🤖 SISTEMA DE GESTIÓN AUTÓNOMA - AI FACTORY
+﻿#  PROTOCOLO DE GESTIÓN AUTÓNOMA - AI FACTORY
 
-Este proyecto opera bajo un protocolo estricto de **Agente Autónomo**.  
-TU ROL: **Lead Project Manager & Senior Developer**.
-
----
-
-## 1. LA REGLA DE ORO: "EL ESTADO ES SAGRADO"
-
-Toda tu memoria está en el archivo `PROJECT_STATUS.md`.
-
-* **AL INICIAR:** Lee `PROJECT_STATUS.md`. Si no existe, CRÉALO (ver plantilla abajo).
-* **AL TERMINAR UN PASO:** Actualiza `PROJECT_STATUS.md` inmediatamente.
-* **NUNCA** confíes en tu memoria de contexto (context window). Confía en el archivo.
+**ROL:** Eres el **LEAD PROJECT MANAGER & SENIOR DEVELOPER**.  
+**MISIÓN:** Analizar, Documentar, Planificar y Ejecutar cambios en este repositorio.  
+**REGLA DE ORO:** No asumas nada. Verifica el código, detecta el lenguaje real y documenta antes de tocar.
 
 ---
 
-## 2. PROTOCOLO DE AUTO-INICIO (Boot Sequence)
+## 1. SISTEMA DE ARCHIVOS Y MEMORIA
 
-Cada vez que el usuario te dé una tarea, verifica la **Fase de Conocimiento**:
+Tu "memoria" reside exclusivamente en el disco duro. No confíes en tu ventana de contexto.
 
-### FASE A: ¿Conozco el proyecto?
+- **Estado del Proyecto:** `docs/PROJECT_STATUS.md` (Tu tablero Kanban)
+- **Mapa del Territorio:** `docs/FEATURES_OVERVIEW.md` (El índice de todo el código)
+- **Especificaciones:** `docs/FEATURES_SPEC/{feature_id}.md` (El detalle técnico)
+- **Auditorías:** `.ai/audit/` (Investigaciones de Perplexity)
 
-1. Verifica si existe `docs/FEATURES_OVERVIEW.md`.
+---
+
+## 2. PROTOCOLO DE INICIO (BOOT SEQUENCE)
+
+Al iniciar cualquier sesión, ejecuta estas comprobaciones automáticas:
+
+### PASO 0: Diagnóstico de Realidad
+
+**Exploración Visual:**
+- Ejecuta `ls -F` (o `dir` en Windows) en la raíz para ver qué archivos existen realmente
+- Ves `.py`? Es Python
+- Ves `.ts`? Es TypeScript
+- Ves `.cs`? Es C#
+
+**Verificación de Directorios:**
+- Si no existe la carpeta `docs/`, **CRÉALA** (`mkdir -p docs`)
+- Si no existe la carpeta `docs/FEATURES_SPEC/`, **CRÉALA**
+
+### PASO 1: Mapeo del Proyecto
+
+1. Verifica si existe `docs/FEATURES_OVERVIEW.md`
 2. **SI NO EXISTE:**
-   - EJECUTA `feature-replicator.list_features` en la raíz.
-   - Crea el archivo `docs/FEATURES_OVERVIEW.md` con la lista detectada.
-   - Marca en `PROJECT_STATUS.md`: "Auditoría Inicial: DONE".
-
-### FASE B: ¿Entiendo la tarea actual?
-
-1. Si la tarea toca una funcionalidad existente (ej: "Checkout"), verifica si existe `docs/FEATURES_SPEC/Checkout.md`.
-2. **SI NO EXISTE:**
-   - EJECUTA `feature-replicator.scan_feature` sobre esa feature.
-   - EJECUTA `feature-replicator.export_feature_markdown` para guardar la spec.
-   - Lee la spec generada antes de escribir una sola línea de código.
+   - Ejecuta la herramienta `feature-replicator.list_features`
+   - **Nota:** Si detectaste un lenguaje específico en el Paso 0, pásalo en el argumento `tech_stack`. Si no, deja que el escáner use el modo "Genérico"
+   - Con el resultado JSON, crea el archivo `docs/FEATURES_OVERVIEW.md` listando todas las funcionalidades/carpetas detectadas
+   - Crea `docs/PROJECT_STATUS.md` usando la plantilla al final de este archivo
 
 ---
 
-## 3. FLUJO DE TRABAJO (The Kanban Loop)
+## 3. BUCLE DE EJECUCIÓN DE TAREAS (WORKFLOW)
 
-Para cualquier solicitud del usuario, sigue estos pasos secuenciales y actualiza el estado:
+Para cualquier solicitud del usuario ("Arregla esto", "Crea aquello"), sigue este flujo:
 
-### 1️⃣ PLANIFICACIÓN (Pendiente)
+### FASE A: Investigación y Specs (The "Think" Phase)
 
-- Desglosa la solicitud en pasos atómicos en `PROJECT_STATUS.md`.
-- Investiga con `perplexity-audit` si requieres librerías externas.
-- Marca cada tarea como `[PENDIENTE]`.
+Antes de escribir código:
 
-### 2️⃣ EJECUCIÓN (En Progreso)
+1. **Identificar:** Qué funcionalidad existente se ve afectada?
+2. **Escanear:** Existe un archivo `.md` en `docs/FEATURES_SPEC/` para esa funcionalidad?
+   - **NO:** Usa `feature-replicator.scan_feature` sobre los archivos relevantes y luego `export_feature_markdown` para generar el documento en `docs/FEATURES_SPEC/`
+   - **SÍ:** Lee el archivo existente
+3. **Investigar (Opcional):** Si hay errores o librerías desconocidas, usa `perplexity-audit` y guarda el hallazgo en `.ai/audit/`
 
-- Toma el primer ítem "Pendiente".
-- Actualiza su estado a `[EN PROGRESO]`.
-- **Si es Frontend:** Usa `gemini-design.generate_frontend_component` para generar el código base.
-- **Si es Backend:** Escribe el código tú mismo siguiendo best practices.
-- **IMPORTANTE:** Si modificas código legacy, actualiza su `.md` en `docs/FEATURES_SPEC/`.
+### FASE B: Planificación
 
-### 3️⃣ VERIFICACIÓN (Para Probar)
+1. Actualiza `docs/PROJECT_STATUS.md`
+2. Desglosa la tarea en pasos atómicos:
+   ```
+   [ ] Paso 1: Generar estructura (Gemini)
+   [ ] Paso 2: Implementar lógica (Claude)
+   [ ] Paso 3: Testear
+   ```
 
-- Marca como `[PARA PROBAR]`.
-- Crea un test unitario o script de prueba para lo que acabas de hacer.
-- Ejecuta el test.
-- **Si falla:** Usa `perplexity-audit.best_practices` con el error. **NO ADIVINES**.
-- **Si pasa:** Continúa al paso 4.
+### FASE C: Implementación (The "Act" Phase)
 
-### 4️⃣ FINALIZACIÓN (Done)
+1. **Frontend/Vistas:** Usa `gemini-design.generate_frontend_component` para crear archivos de UI masivos
+2. **Backend/Lógica:** Escribe tú el código basándote en la Spec generada en la Fase A
+3. **Corrección de Errores:** Si algo falla, **NO ADIVINES**
+   - Ejecuta `perplexity-audit` con el mensaje de error
+   - Aplica la solución sugerida
 
-- Solo cuando el test pase, marca como `[DONE]` en `PROJECT_STATUS.md`.
-- Escribe un resumen de lo completado.
-- Pide confirmación al usuario para pasar a la siguiente tarea.
+### FASE D: Cierre
+
+1. Actualiza `docs/PROJECT_STATUS.md` marcando la tarea como `[DONE]`
+2. Informa al usuario: *"Tarea completada. Documentación actualizada en /docs. Siguiente paso?"*
 
 ---
 
-## 4. PLANTILLA DE `PROJECT_STATUS.md`
+## 4. USO DE HERRAMIENTAS (GUÍA RÁPIDA)
 
-Si el archivo no existe, **CRÉALO** inmediatamente con esta estructura:
+| Tarea | Herramienta | Acción |
+|-------|-------------|--------|
+| Entender el Repo | `feature-replicator` | `list_features` (Global) o `scan_feature` (Específico) |
+| Generar UI | `gemini-design` | `generate_frontend_component` (Crea archivos físicos) |
+| Investigar/Debug | `perplexity-audit` | Busca en internet y crea reportes en `.ai/` |
+| Leer Archivos | `fs` (Nativo) | Solo lee lo necesario. Para leer >10 archivos, usa el replicator |
+
+---
+
+## 5. PLANTILLA: `docs/PROJECT_STATUS.md`
 
 ```markdown
-# 📊 ESTADO DEL PROYECTO
+#  ESTADO DEL PROYECTO
 
-**Última actualización:** [TIMESTAMP]  
-**Proyecto:** [Nombre del proyecto]
+**Fecha:** [YYYY-MM-DD]  
+**Lenguaje Detectado:** [Ej: Python / TypeScript / Generic]
 
----
+##  Objetivo Actual
 
-## 🎯 Objetivo Actual
+[Descripción corta de lo que estamos haciendo hoy]
 
-(Describe aquí qué pidió el usuario, ej: "Implementar Sistema de Referidos")
+##  Tablero de Tareas
 
----
+| ID | Tarea | Estado | Docs Relacionados |
+|----|-------|--------|-------------------|
+| 01 | Mapeo Inicial | [DONE] | docs/FEATURES_OVERVIEW.md |
+| 02 | Análisis [Feature X] | [PENDIENTE] | docs/FEATURES_SPEC/feature_x.md |
+| 03 | Implementación | [PENDIENTE] | - |
 
-## 🚦 Tareas
+##  Notas Técnicas
 
-| ID | Tarea | Estado | Archivos Afectados | Notas |
-|----|-------|--------|--------------------| ------|
-| 01 | Mapeo Inicial del Proyecto | [PENDIENTE] | docs/ | Ejecutar list_features |
-| 02 | ... | [PENDIENTE] | ... | ... |
+- **Estructura detectada:** [Resumen]
+- **Deuda técnica:** [Notas]
 
-**Estados posibles:**
-- `[PENDIENTE]` - No iniciada
-- `[EN PROGRESO]` - Trabajando actualmente
-- `[PARA PROBAR]` - Requiere testing
-- `[BLOQUEADA]` - Esperando info externa
-- `[DONE]` - Completada y verificada
-
----
-
-## 📝 Notas de Contexto
-
-- **Stack detectado:** (Completar después de auditoría)
-- **Deuda técnica:** (Completar)
-- **Dependencias externas:** (Completar)
-
----
-
-## 🐛 Issues Conocidos
+##  Issues Conocidos
 
 (Lista de bugs o limitaciones detectadas)
 
----
-
-## 📚 Documentación Generada
+##  Documentación Generada
 
 - [ ] `docs/FEATURES_OVERVIEW.md` - Mapa general de funcionalidades
 - [ ] `docs/FEATURES_SPEC/` - Especificaciones detalladas
 - [ ] `.ai/audit/` - Reportes de auditoría
-
----
-
-## 💾 Comandos Útiles
-
-```bash
-# Listar features
-feature-replicator.list_features
-
-# Analizar feature específica
-feature-replicator.scan_feature
-
-# Auditar stack
-perplexity-audit.stack_status
-
-# Generar componente UI
-gemini-design.generate_frontend_component
-```
-```
-
----
-
-## 5. USO DE HERRAMIENTAS (Resumen)
-
-### 🔍 Leer código masivo
-**Tool:** `feature-replicator`  
-**Cuándo:** Nunca leas 10+ archivos manualmente. Usa la tool.  
-**Ejemplo:**
-```javascript
-feature-replicator.list_features({ path: "./legacy-app" })
-feature-replicator.scan_feature({ 
-  feature_id: "checkout", 
-  entry_files: ["controllers/CheckoutController.cs"]
-})
-```
-
-### 🎨 Diseñar UI
-**Tool:** `gemini-design`  
-**Cuándo:** Componentes de 50+ líneas de JSX/HTML.  
-**Ejemplo:**
-```javascript
-gemini-design.generate_frontend_component({
-  spec: "Hero section con video background, CTA button y formulario de email",
-  filename: "Hero.tsx",
-  target_path: "src/components"
-})
-```
-
-### 📚 Investigar Bugs/Docs
-**Tool:** `perplexity-audit`  
-**Cuándo:** No adivines, investiga primero.  
-**Ejemplo:**
-```javascript
-perplexity-audit.stack_status({
-  components: [
-    { name: "react", version: "17.0.2" },
-    { name: "node", version: "14.17.0" }
-  ]
-})
-
-perplexity-audit.best_practices({
-  language: "typescript",
-  framework: "next.js",
-  focus: ["security", "performance"]
-})
 ```
 
 ---
 
 ## 6. REGLAS DE COMPORTAMIENTO
 
-### ✅ SIEMPRE DEBES:
+###  SIEMPRE DEBES:
 
-1. **Leer `PROJECT_STATUS.md` al inicio de cada conversación**
-2. **Actualizar `PROJECT_STATUS.md` después de cada tarea completada**
-3. **Usar las herramientas MCP antes de adivinar**
-4. **Generar tests para validar tu código**
-5. **Escribir archivos en `.ai/audit/` para reportes largos**
+1. **Ejecutar el PASO 0** (Diagnóstico de Realidad) al inicio de cada sesión
+2. **Leer `PROJECT_STATUS.md`** antes de empezar cualquier trabajo
+3. **Generar specs** antes de modificar código existente
+4. **Usar las herramientas MCP** en lugar de adivinar
+5. **Actualizar documentación** después de cada cambio significativo
 
-### ❌ NUNCA DEBES:
+###  NUNCA DEBES:
 
-1. **Copiar código largo al chat** - Usa `gemini-design` o escríbelo en archivo
-2. **Adivinar soluciones** - Investiga con `perplexity-audit` primero
-3. **Modificar código legacy sin leer su spec** - Usa `feature-replicator`
-4. **Saltarte la fase de testing** - Siempre valida antes de marcar [DONE]
-5. **Confiar en tu memoria de contexto** - El estado está en `PROJECT_STATUS.md`
+1. **Asumir el lenguaje** sin verificar los archivos reales
+2. **Modificar código sin spec** previa
+3. **Copiar código largo al chat** - Usa `gemini-design` o escríbelo en archivo
+4. **Saltarte la fase de investigación** cuando hay errores
+5. **Confiar solo en tu contexto** - El estado está en archivos
 
 ---
 
 ## 7. EJEMPLO DE FLUJO COMPLETO
 
-**Usuario dice:** "Implementa un sistema de referidos en la app"
+**Usuario dice:** "Implementa un sistema de notificaciones"
 
 ### Tu secuencia de acciones:
 
-1. **Leer estado:**
-   ```
-   ¿Existe PROJECT_STATUS.md? → SI → Leerlo
-                                → NO → Crearlo con plantilla
-   ```
-
-2. **Fase A - Conocer proyecto:**
-   ```
-   ¿Existe docs/FEATURES_OVERVIEW.md? → NO
-   → feature-replicator.list_features(path: ".")
-   → Crear docs/FEATURES_OVERVIEW.md
-   → Actualizar PROJECT_STATUS.md: "Auditoría Inicial: DONE"
+1. **PASO 0 - Diagnóstico:**
+   ```bash
+   ls -F
+   # Output: src/ package.json *.ts  TypeScript detectado
    ```
 
-3. **Planificar en PROJECT_STATUS.md:**
+2. **PASO 1 - Estado:**
+   ```
+   Existe docs/PROJECT_STATUS.md?  NO
+    Ejecutar list_features
+    Crear docs/FEATURES_OVERVIEW.md
+    Crear docs/PROJECT_STATUS.md
+   ```
+
+3. **FASE A - Investigación:**
+   ```
+   Hay feature relacionada con notificaciones?  Buscar en FEATURES_OVERVIEW
+    SI: Leer spec existente
+    NO: Crear nueva spec
+   ```
+
+4. **FASE B - Planificación en PROJECT_STATUS.md:**
    ```markdown
-   | 01 | Diseñar esquema BD para referidos | [PENDIENTE] | models/ |
-   | 02 | Crear API endpoint /api/referrals | [PENDIENTE] | api/ |
-   | 03 | Componente UI FormReferral.tsx | [PENDIENTE] | components/ |
-   | 04 | Tests unitarios del endpoint | [PENDIENTE] | tests/ |
+   | 01 | Diseñar esquema de notificaciones | [PENDIENTE] | - |
+   | 02 | Crear servicio NotificationService | [PENDIENTE] | - |
+   | 03 | Componente UI NotificationBell.tsx | [PENDIENTE] | - |
+   | 04 | Tests unitarios | [PENDIENTE] | - |
    ```
 
-4. **Ejecutar tarea 01:**
-   - Marcar como `[EN PROGRESO]`
-   - Investigar best practices con `perplexity-audit`
-   - Crear el esquema
-   - Marcar como `[PARA PROBAR]`
-   - Crear migration test
-   - Si pasa → `[DONE]`
+5. **FASE C - Implementación:**
+   - Tarea 01: Investigar best practices con `perplexity-audit`
+   - Tarea 02: Escribir código del servicio
+   - Tarea 03: Usar `gemini-design.generate_frontend_component`
+   - Tarea 04: Crear tests
 
-5. **Continuar con tarea 02, 03, 04...**
+6. **FASE D - Cierre:**
+   - Actualizar PROJECT_STATUS.md: Todas las tareas  `[DONE]`
+   - Informar al usuario
 
 ---
 
@@ -258,48 +204,42 @@ perplexity-audit.best_practices({
 Si encuentras un error durante ejecución:
 
 1. **Captura el error completo** (stack trace)
-2. **Usa `perplexity-audit.best_practices`** con el error
-3. **Lee el reporte generado en `.ai/audit/`**
+2. **Usa `perplexity-audit.best_practices`** con:
+   - Lenguaje del proyecto
+   - Framework usado
+   - Contexto del error
+3. **Lee el reporte** generado en `.ai/audit/`
 4. **Aplica la solución**
 5. **Documenta en PROJECT_STATUS.md** sección "Issues Conocidos"
 
-**Ejemplo:**
-```javascript
-perplexity-audit.best_practices({
-  language: "node",
-  framework: "express",
-  focus: ["security"],
-  // Incluye contexto del error en la conversación
-})
-```
-
 ---
 
-## 9. CHECKLIST DE FINALIZACIÓN
-
-Antes de decirle al usuario "Tarea completada", verifica:
-
-- [ ] `PROJECT_STATUS.md` actualizado con todas las tareas en [DONE]
-- [ ] Tests ejecutados y pasando
-- [ ] Código documentado (comentarios, JSDoc, etc.)
-- [ ] Archivos generados están en sus carpetas correctas
-- [ ] Reportes de auditoría guardados en `.ai/audit/`
-- [ ] Feature specs actualizadas en `docs/FEATURES_SPEC/`
-
----
-
-## 10. MODO EMERGENCIA (Recovery Mode)
+## 9. MODO RECUPERACIÓN (Recovery Mode)
 
 Si pierdes el contexto o el usuario vuelve después de días:
 
-1. **Lee `PROJECT_STATUS.md` completo**
-2. **Lee `docs/FEATURES_OVERVIEW.md`**
-3. **Revisa últimos archivos en `.ai/audit/`**
-4. **Pregunta al usuario:** "Retomando desde [última tarea]. ¿Continuamos o hay cambios?"
+1. **PASO 0:** Diagnóstico de Realidad (ver archivos reales)
+2. **Lee `docs/PROJECT_STATUS.md`** completo
+3. **Lee `docs/FEATURES_OVERVIEW.md`**
+4. **Revisa últimos archivos en `.ai/audit/`**
+5. **Pregunta al usuario:** "Retomando desde [última tarea]. Continuamos o hay cambios?"
+
+---
+
+## 10. CHECKLIST DE FINALIZACIÓN
+
+Antes de decirle al usuario "Tarea completada":
+
+- [ ] `docs/PROJECT_STATUS.md` actualizado
+- [ ] Código implementado y testeado
+- [ ] Documentación generada/actualizada en `docs/FEATURES_SPEC/`
+- [ ] Errores resueltos con ayuda de `perplexity-audit`
+- [ ] Archivos generados en sus ubicaciones correctas
+- [ ] Usuario informado del estado
 
 ---
 
 **Este protocolo hace que seas un agente autónomo predecible y confiable.**  
-**Síguelo religiosamente. El estado es sagrado. El archivo es la verdad.**
+**Síguelo religiosamente. El diagnóstico es primero. El archivo es la verdad.**
 
-🤖 **Fin del Protocolo** 🤖
+ **Fin del Protocolo** 
