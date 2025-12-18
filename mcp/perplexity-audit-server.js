@@ -78,6 +78,37 @@ if (!PERPLEXITY_API_KEY) {
 log("MCP Perplexity Audit Server iniciando...");
 
 /**
+ * Helper: Escribir reporte en archivo markdown
+ * Guarda el reporte en .ai/audit/ y retorna mensaje corto
+ */
+function writeAuditReport(reportType, content) {
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const timestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[1].substring(0, 8); // HH-MM-SS
+  
+  // Crear directorio .ai/audit si no existe
+  const auditDir = path.join(process.cwd(), ".ai", "audit");
+  if (!fs.existsSync(auditDir)) {
+    fs.mkdirSync(auditDir, { recursive: true });
+    log(`Directorio creado: ${auditDir}`);
+  }
+  
+  // Nombre de archivo: YYYY-MM-DD_HH-MM-SS_[tipo].md
+  const filename = `${dateStr}_${timestamp}_${reportType}.md`;
+  const filePath = path.join(auditDir, filename);
+  
+  // Escribir archivo
+  fs.writeFileSync(filePath, content, "utf8");
+  log(`✅ Reporte guardado: ${filePath}`);
+  
+  return {
+    file_path: filePath,
+    file_name: filename,
+    message: `✅ Reporte generado en .ai/audit/${filename}. Léelo para continuar.`
+  };
+}
+
+/**
  * Realiza una consulta a Perplexity API
  */
 async function queryPerplexity(prompt, systemPrompt = null) {
@@ -213,7 +244,62 @@ Responde SOLO con JSON válido, sin texto adicional antes o después.`;
     }
     
     log(`stack_status completada exitosamente - ${parsed.components.length} componentes, riesgo: ${parsed.overall_risk}`);
-    return parsed;
+    
+    // Generar reporte markdown
+    const markdown = `# 🔍 Stack Status Report
+
+**Fecha:** ${new Date().toLocaleString()}
+**Tipo de aplicación:** ${appType}
+
+---
+
+## 📊 Resumen Ejecutivo
+
+**Riesgo General:** ${
+      parsed.overall_risk === 'high' ? '🔴 ALTO' :
+      parsed.overall_risk === 'medium' ? '🟡 MEDIO' : '🟢 BAJO'
+    }
+
+${parsed.summary}
+
+---
+
+## 🔧 Componentes Analizados
+
+${parsed.components.map((comp, idx) => `
+### ${idx + 1}. ${comp.name} ${comp.version || ''}
+
+- **Estado:** ${
+  comp.status === 'eol' ? '❌ End of Life (EOL)' :
+  comp.status === 'nearing_eol' ? '⚠️ Próximo a EOL' : '✅ Soportado activamente'
+}
+- **Versión recomendada:** \`${comp.recommended_version}\`
+
+**Notas:**
+${comp.notes}
+`).join('\n---\n')}
+
+---
+
+## 🎯 Recomendaciones
+
+${parsed.components.filter(c => c.status !== 'current').length > 0 ? `
+### Actualizaciones prioritarias:
+
+${parsed.components.filter(c => c.status !== 'current').map(c => 
+  `- **${c.name}**: actualizar de \`${c.version}\` a \`${c.recommended_version}\``
+).join('\n')}
+` : '✅ Todos los componentes están actualizados.'}
+
+---
+
+*Reporte generado automáticamente por perplexity-audit MCP*
+`;
+    
+    // Escribir archivo y retornar mensaje corto
+    const report = writeAuditReport('stack_status', markdown);
+    return report;
+    
   } catch (error) {
     log(`ERROR en stack_status: ${error.message}`);
     throw error; // Relanzar para que Claude vea que la tool falló
@@ -321,7 +407,48 @@ Responde SOLO con JSON válido, sin texto adicional antes o después.`;
     }
     
     log(`best_practices completada exitosamente - Áreas: ${Object.keys(parsed).filter(k => k !== 'error').join(', ')}`);
-    return parsed;
+    
+    // Generar reporte markdown
+    const markdown = `# 💡 Best Practices Report
+
+**Fecha:** ${new Date().toLocaleString()}
+**Stack:** ${language} + ${framework}${database ? ' + ' + database : ''}
+**Tipo de aplicación:** ${appType}
+**Áreas de enfoque:** ${focusAreas}
+
+---
+
+${Object.entries(parsed).map(([area, data]) => {
+  if (area === 'error' || !data.summary) return '';
+  
+  const emoji = {
+    security: '🔒',
+    performance: '⚡',
+    maintainability: '🔧',
+    scalability: '📈',
+    testing: '✅'
+  }[area] || '📋';
+  
+  return `## ${emoji} ${area.charAt(0).toUpperCase() + area.slice(1)}
+
+**Resumen:**
+${data.summary}
+
+**Recomendaciones:**
+
+${data.recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n\n')}
+`;
+}).filter(Boolean).join('\n---\n\n')}
+
+---
+
+*Reporte generado automáticamente por perplexity-audit MCP*
+`;
+    
+    // Escribir archivo y retornar mensaje corto
+    const report = writeAuditReport('best_practices', markdown);
+    return report;
+    
   } catch (error) {
     log(`ERROR en best_practices: ${error.message}`);
     throw error; // Relanzar para que Claude vea que la tool falló
@@ -435,7 +562,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [
           {
             type: "text",
-            text: JSON.stringify(result, null, 2)
+            text: result.message // Solo mensaje corto, no JSON completo
           }
         ]
       };
@@ -453,7 +580,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [
           {
             type: "text",
-            text: JSON.stringify(result, null, 2)
+            text: result.message // Solo mensaje corto, no JSON completo
           }
         ]
       };

@@ -1,24 +1,39 @@
 # 🚀 Instalación Rápida - AI Factory
 
-Sigue estos pasos para poner en marcha el ecosistema de auditoría en menos de 5 minutos.
+Sigue estos pasos para poner en marcha el ecosistema completo en menos de 10 minutos.
 
 ---
 
-## ⚡ Instalación Express
+## 📋 Prerequisitos
 
-### 1. Clonar e instalar
+- Node.js 18+ instalado
+- Claude Desktop instalado
+- Cuentas en Perplexity AI y Google AI Studio
+
+---
+
+## ⚡ Paso 1: Instalar Dependencias
+
+Abre tu terminal **dentro de la carpeta AI-factory** y ejecuta:
 
 ```bash
-git clone https://github.com/tu-usuario/ai-factory.git
-cd ai-factory
-npm install
+npm install @google/generative-ai
 ```
 
-### 2. Configurar API Key de Perplexity
+**Nota:** Las demás dependencias ya deberían estar instaladas. Si no, ejecuta `npm install`.
 
-Obtén tu API key en: https://www.perplexity.ai/settings/api
+---
 
-Crea el archivo `.env`:
+## 🔑 Paso 2: Configurar las Llaves (Secretos)
+
+### Obtener API Keys
+
+1. **Perplexity**: https://www.perplexity.ai/settings/api
+2. **Gemini**: https://aistudio.google.com/app/apikey
+
+### Crear archivo .env
+
+Crea el archivo `.env` en la raíz de AI-factory:
 
 ```bash
 # Windows
@@ -28,21 +43,46 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Edita `.env` y añade tu key:
+Edita `.env` y añade tus keys:
 
 ```env
-PERPLEXITY_API_KEY=pplx-xxxxxxxxxxxxxxxxxxxxx
+PERPLEXITY_API_KEY=pplx-xxxxxxxxxxxxxxxxxxxx
+GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-### 3. Configurar Claude Desktop
+⚠️ **IMPORTANTE**: Nunca subas este archivo a Git. Ya está en `.gitignore`.
 
-**Ubicación del archivo de configuración**:
+---
 
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+## 🧠 Paso 3: Conectar el Cerebro (Claude Desktop Config)
 
-**Añade esta configuración**:
+Este es el paso **MÁS IMPORTANTE**. Tienes que decirle a Claude Desktop dónde están tus servidores MCP.
+
+### 3.1 Abrir el archivo de configuración
+
+**Windows:**
+1. Presiona `Win + R`
+2. Escribe: `%APPDATA%\Claude\claude_desktop_config.json`
+3. Dale Enter
+
+**macOS:**
+```bash
+open ~/Library/Application\ Support/Claude/claude_desktop_config.json
+```
+
+**Linux:**
+```bash
+nano ~/.config/Claude/claude_desktop_config.json
+```
+
+### 3.2 Copiar esta configuración
+
+⚠️ **MUY IMPORTANTE**: Reemplaza `TU_RUTA_ABSOLUTA` por la ruta real donde tienes AI-factory.
+
+**Ejemplo rutas:**
+- Windows: `C:/Users/Usuario/Documentos/AI-factory`
+- Mac: `/Users/tu/dev/AI-factory`
+- Linux: `/home/tu/proyectos/AI-factory`
 
 ```json
 {
@@ -50,56 +90,161 @@ PERPLEXITY_API_KEY=pplx-xxxxxxxxxxxxxxxxxxxxx
     "perplexity-audit": {
       "command": "node",
       "args": [
-        "C:\\ruta\\absoluta\\a\\ai-factory\\mcp\\perplexity-audit-server.js"
+        "TU_RUTA_ABSOLUTA/mcp/perplexity-audit-server.js"
       ],
       "env": {
-        "PERPLEXITY_API_KEY": "pplx-xxxxxxxxxxxxxxxxxxxxx"
+        "PERPLEXITY_API_KEY": "tu_clave_de_perplexity_aqui"
       }
+    },
+    "gemini-design": {
+      "command": "node",
+      "args": [
+        "TU_RUTA_ABSOLUTA/mcp/gemini-design-server.js"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "tu_clave_de_gemini_aqui"
+      }
+    },
+    "feature-replicator": {
+      "command": "node",
+      "args": [
+        "TU_RUTA_ABSOLUTA/mcp/feature-replicator-server.js"
+      ]
     }
   }
 }
 ```
 
-> ⚠️ **Importante**: 
-> - Reemplaza `C:\\ruta\\absoluta\\a\\ai-factory` con la ruta real donde clonaste el proyecto
-> - En Windows, usa dobles barras invertidas `\\` o barras normales `/`
-> - Reemplaza `pplx-xxxxxxxxxxxxxxxxxxxxx` con tu API key real
+**💡 Consejo**: Aunque uses `.env` en el código, es más seguro poner las keys directamente en el JSON para asegurar que Claude las pase al proceso de Node.
 
-### 4. Reiniciar Claude Desktop
+### 3.3 Guardar y reiniciar
 
-Cierra completamente Claude Desktop y ábrelo de nuevo.
-
-### 5. Verificar instalación
-
-En Claude Desktop, abre el proyecto que quieres auditar y escribe:
-
-```
-Revisa este proyecto en ./. Prioriza seguridad, bugs críticos y rendimiento.
-Si conviene, propón recrearlo en un stack moderno y seguro, y dime por qué.
-```
-
-Claude debería:
-1. Detectar las herramientas MCP disponibles (`stack_status`, `best_practices`)
-2. Comenzar la auditoría siguiendo las 4 fases
-3. Generar los documentos en `docs/`
+1. Guarda el archivo (`Ctrl+S` o `Cmd+S`)
+2. **Cierra Claude Desktop completamente** (asegúrate de que no esté minimizado en la bandeja del sistema)
+3. Abre Claude Desktop de nuevo
 
 ---
 
-## 🔍 Verificar que funciona
+## ✅ Paso 4: Verificar Instalación
 
-### Verificar logs
+Una vez que Claude Desktop se reinicie, deberías ver los servidores MCP conectados.
 
-Después de usar el MCP, verifica que se está generando el log:
+### Prueba rápida
+
+Abre Claude y pregunta:
+
+**Para probar Perplexity:**
+```
+Analiza el stack: Python 3.9, Django 3.2, PostgreSQL 12
+```
+
+**Para probar Gemini:**
+```
+Genera un componente Button.tsx con variantes primary y secondary usando Tailwind
+```
+
+**Para probar Feature Replicator:**
+```
+Lista las funcionalidades en ./mi-proyecto-legacy
+```
+
+Si ves que Claude usa las herramientas MCP, **¡felicidades! 🎉** Todo está funcionando.
+
+---
+
+## 🐛 Solución de Problemas
+
+### Error: "No MCP servers found"
+
+**Causa:** Claude no encuentra el archivo de configuración o la ruta es incorrecta.
+
+**Solución:**
+1. Verifica que la ruta en `claude_desktop_config.json` sea absoluta y correcta
+2. Usa barras `/` en lugar de `\\` (funciona en Windows también)
+3. Reinicia Claude completamente (cierra desde la bandeja)
+
+### Error: "PERPLEXITY_API_KEY is not defined"
+
+**Causa:** La API key no está llegando al proceso.
+
+**Solución:**
+1. Pon la key directamente en `claude_desktop_config.json` en la sección `env`
+2. Verifica que no tenga espacios ni comillas extras
+3. Reinicia Claude Desktop
+
+### Los logs están vacíos
+
+**Causa:** Los servidores no se están ejecutando.
+
+**Solución:**
+1. Ejecuta manualmente para ver errores:
+   ```bash
+   node mcp/perplexity-audit-server.js
+   ```
+2. Verifica que Node.js 18+ esté instalado: `node --version`
+3. Reinstala dependencias: `npm install`
+
+### "Module not found: @modelcontextprotocol/sdk"
+
+**Causa:** Dependencias no instaladas.
+
+**Solución:**
+```bash
+npm install
+```
+
+---
+
+## 📂 Verificar Logs
+
+Después de usar los servidores MCP, verifica que se estén generando logs:
 
 ```bash
-# Ver últimas líneas del log
+# Ver logs de Perplexity
 cat mcp/perplexity-audit.log    # macOS/Linux
 type mcp\perplexity-audit.log   # Windows
+
+# Ver logs de Gemini
+cat mcp/gemini-design.log
+type mcp\gemini-design.log
+
+# Ver logs de Feature Replicator
+cat mcp/logs/feature-replicator.log
+type mcp\logs\feature-replicator.log
 ```
 
 Deberías ver líneas como:
 
 ```
+[2025-12-18T10:30:45.123Z] MCP Perplexity Audit Server iniciando...
+[2025-12-18T10:30:45.456Z] MCP Perplexity Audit Server conectado y listo
+[2025-12-18T10:31:02.789Z] Herramienta invocada: stack_status
+[2025-12-18T10:31:03.012Z] Llamando a Perplexity API (prompt length: 234 chars)
+[2025-12-18T10:31:08.345Z] Perplexity API OK - Tokens usados: 1234
+[2025-12-18T10:31:08.567Z] ✅ Reporte guardado: .ai/audit/2025-12-18_10-31-08_stack_status.md
+```
+
+---
+
+## 📚 Siguiente Paso
+
+Una vez instalado, lee el [Protocolo de Operación](templates/AGENTS_TEMPLATE.md) para aprender:
+- Cuándo usar cada herramienta
+- Reglas de oro para ahorrar tokens
+- Flujos de trabajo recomendados
+- Best practices del ecosistema
+
+---
+
+## 🆘 ¿Necesitas Ayuda?
+
+1. Revisa los logs en `mcp/*.log`
+2. Consulta la documentación en `docs/`
+3. Abre un issue en GitHub
+
+---
+
+**¡Listo para empezar! 🚀** Ahora Claude tiene superpoderes de auditoría, diseño y análisis legacy.
 [2025-12-15T10:30:00.000Z] MCP Perplexity Audit Server iniciando...
 [2025-12-15T10:30:00.500Z] MCP Perplexity Audit Server conectado y listo
 [2025-12-15T10:31:15.123Z] Herramienta invocada: stack_status
