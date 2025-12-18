@@ -126,40 +126,76 @@ function validateInput(inputName, value, type, options = {}) {
 
 /**
  * Helper: Buscar archivos recursivamente con filtro de extensiones
+ * Versión ROBUSTA con validaciones completas
  */
 function findFiles(dirPath, extensions, maxFiles = 1000) {
   const results = [];
   
+  // Validar entrada
+  if (!dirPath || typeof dirPath !== 'string') {
+    log(`ERROR: Invalid dirPath provided to findFiles`);
+    return results;
+  }
+  
+  if (!Array.isArray(extensions)) {
+    log(`ERROR: extensions must be an array`);
+    return results;
+  }
+  
   function scanDir(currentPath, depth = 0) {
+    // Límites de seguridad
     if (results.length >= maxFiles || depth > 10) return;
     
     try {
+      // Validar que el path existe y es accesible
+      if (!fs.existsSync(currentPath)) {
+        return;
+      }
+      
       const entries = fs.readdirSync(currentPath, { withFileTypes: true });
       
       for (const entry of entries) {
         if (results.length >= maxFiles) break;
         
-        const fullPath = path.join(currentPath, entry.name);
+        // VALIDACIÓN CRÍTICA: Verificar que entry y entry.name existen
+        if (!entry || !entry.name || typeof entry.name !== 'string') {
+          log(`WARNING: Invalid entry in ${currentPath}, skipping`);
+          continue;
+        }
         
-        // Ignorar directorios comunes
-        if (entry.isDirectory()) {
-          const ignoreDirs = ['node_modules', 'bin', 'obj', '.git', '.vs', 'packages', 'vendor', '__pycache__'];
-          if (!ignoreDirs.includes(entry.name)) {
-            scanDir(fullPath, depth + 1);
+        try {
+          const fullPath = path.join(currentPath, entry.name);
+          
+          // Ignorar directorios comunes
+          if (entry.isDirectory()) {
+            const ignoreDirs = [
+              'node_modules', 'bin', 'obj', '.git', '.vs', '.vscode',
+              'packages', 'vendor', '__pycache__', 'dist', 'build',
+              '.next', '.nuxt', 'coverage', 'temp', 'tmp'
+            ];
+            
+            if (!ignoreDirs.includes(entry.name.toLowerCase())) {
+              scanDir(fullPath, depth + 1);
+            }
+          } else if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            if (extensions.length === 0 || extensions.includes(ext)) {
+              results.push(fullPath);
+            }
           }
-        } else if (entry.isFile()) {
-          const ext = path.extname(entry.name).toLowerCase();
-          if (extensions.includes(ext)) {
-            results.push(fullPath);
-          }
+        } catch (entryError) {
+          log(`ERROR processing entry ${entry.name} in ${currentPath}: ${entryError.message}`);
+          // Continuar con el siguiente archivo
         }
       }
     } catch (error) {
-      log(`Error scanning directory ${currentPath}: ${error.message}`);
+      log(`ERROR scanning directory ${currentPath}: ${error.message}`);
+      // Continuar con otras carpetas
     }
   }
   
   scanDir(dirPath);
+  log(`findFiles completed: ${results.length} files found`);
   return results;
 }
 
@@ -640,55 +676,172 @@ async function detectFeatures(repoPath, tech_stack, maxFiles) {
   const language = tech_stack.language || 'unknown';
   const langConfig = TECH_CONFIG.supported_languages[language];
   
-  if (!langConfig) {
-    log(`Warning: Language '${language}' not configured in TECH_CONFIG`);
-    return [];
-  }
-  
   log(`Detecting features for language: ${language}`);
   
-  // Buscar archivos con las extensiones del lenguaje
-  const extensions = langConfig.extensions || [];
-  const filePaths = findFiles(repoPath, extensions, maxFiles);
-  
-  log(`Found ${filePaths.length} files with extensions: ${extensions.join(', ')}`);
-  
-  // Convertir paths a objetos con full y relative
-  const files = filePaths.map(fullPath => ({
-    full: fullPath,
-    relative: path.relative(repoPath, fullPath)
-  }));
-  
-  // Detectar features según el lenguaje
-  let features = [];
-  
-  switch (language) {
-    case 'csharp':
-      features = detectCSharpFeatures(repoPath, files);
-      break;
-      
-    case 'java':
-      features = detectJavaFeatures(repoPath, files);
-      break;
-      
-    case 'php':
-      features = detectPHPFeatures(repoPath, files);
-      break;
-      
-    case 'python':
-      features = detectPythonFeatures(repoPath, files);
-      break;
-      
-    case 'javascript':
-    case 'typescript':
-      features = detectJavaScriptFeatures(repoPath, files);
-      break;
-      
-    default:
-      log(`Language not yet implemented: ${language}`);
+  // Si no hay configuración específica, hacer detección genérica
+  if (!langConfig) {
+    log(`Language '${language}' not configured. Using generic detection.`);
+    return detectFeaturesGeneric(repoPath, maxFiles);
   }
   
-  return features;
+  try {
+    // Buscar archivos con las extensiones del lenguaje
+    const extensions = langConfig.extensions || [];
+    const filePaths = findFiles(repoPath, extensions, maxFiles);
+    
+    log(`Found ${filePaths.length} files with extensions: ${extensions.join(', ')}`);
+    
+    if (filePaths.length === 0) {
+      log(`No files found with configured extensions. Trying generic detection.`);
+      return detectFeaturesGeneric(repoPath, maxFiles);
+    }
+    
+    // Convertir paths a objetos con full y relative
+    const files = filePaths.map(fullPath => ({
+      full: fullPath,
+      relative: path.relative(repoPath, fullPath)
+    }));
+    
+    // Detectar features según el lenguaje
+    let features = [];
+    
+    try {
+      switch (language) {
+        case 'csharp':
+          features = detectCSharpFeatures(repoPath, files);
+          break;
+          
+        case 'java':
+          features = detectJavaFeatures(repoPath, files);
+          break;
+          
+        case 'php':
+          features = detectPHPFeatures(repoPath, files);
+          break;
+          
+        case 'python':
+          features = detectPythonFeatures(repoPath, files);
+          break;
+          
+        case 'javascript':
+        case 'typescript':
+          features = detectJavaScriptFeatures(repoPath, files);
+          break;
+          
+        default:
+          log(`Language not yet implemented: ${language}. Using generic detection.`);
+          features = detectFeaturesGeneric(repoPath, maxFiles);
+      }
+    } catch (detectionError) {
+      log(`ERROR in language-specific detection: ${detectionError.message}`);
+      log(`Falling back to generic detection`);
+      features = detectFeaturesGeneric(repoPath, maxFiles);
+    }
+    
+    return features;
+    
+  } catch (error) {
+    log(`ERROR in detectFeatures: ${error.message}`);
+    log(`Attempting generic detection as fallback`);
+    return detectFeaturesGeneric(repoPath, maxFiles);
+  }
+}
+
+/**
+ * Detección genérica de features cuando no hay configuración específica
+ * Agrupa archivos por carpeta principal
+ */
+function detectFeaturesGeneric(repoPath, maxFiles = 1000) {
+  log(`Starting generic feature detection`);
+  const features = [];
+  
+  try {
+    // Buscar TODOS los archivos comunes de código
+    const codeExtensions = [
+      '.js', '.ts', '.jsx', '.tsx',
+      '.py', '.java', '.cs', '.php',
+      '.rb', '.go', '.kt', '.swift',
+      '.c', '.cpp', '.h', '.hpp'
+    ];
+    
+    const allFiles = findFiles(repoPath, codeExtensions, maxFiles);
+    log(`Generic detection found ${allFiles.length} code files`);
+    
+    if (allFiles.length === 0) {
+      return features;
+    }
+    
+    // Agrupar por carpeta principal (primer nivel después de la raíz)
+    const folderGroups = {};
+    
+    for (const filePath of allFiles) {
+      try {
+        const relativePath = path.relative(repoPath, filePath);
+        const parts = relativePath.split(path.sep);
+        
+        // Obtener carpeta principal (primer segmento del path)
+        const mainFolder = parts.length > 1 ? parts[0] : 'root';
+        const fileName = path.basename(filePath);
+        const ext = path.extname(fileName).toLowerCase();
+        
+        if (!folderGroups[mainFolder]) {
+          folderGroups[mainFolder] = [];
+        }
+        
+        folderGroups[mainFolder].push({
+          file: relativePath,
+          name: fileName,
+          ext: ext
+        });
+      } catch (fileError) {
+        log(`ERROR processing file ${filePath}: ${fileError.message}`);
+      }
+    }
+    
+    // Crear features por carpeta
+    let featureId = 1;
+    for (const [folder, files] of Object.entries(folderGroups)) {
+      try {
+        // Detectar tipo de feature por patrones en nombres de carpeta
+        let type = 'general';
+        const folderLower = folder.toLowerCase();
+        
+        if (folderLower.includes('controller') || folderLower.includes('api') || folderLower.includes('route')) {
+          type = 'endpoint';
+        } else if (folderLower.includes('service') || folderLower.includes('business')) {
+          type = 'business_logic';
+        } else if (folderLower.includes('model') || folderLower.includes('entity') || folderLower.includes('data')) {
+          type = 'data_access';
+        } else if (folderLower.includes('view') || folderLower.includes('component') || folderLower.includes('ui')) {
+          type = 'ui';
+        } else if (folderLower.includes('util') || folderLower.includes('helper')) {
+          type = 'utility';
+        }
+        
+        features.push({
+          id: `generic-${String(featureId).padStart(3, '0')}`,
+          type: type,
+          language: 'multi',
+          files: files.map(f => f.file).slice(0, 20), // Limitar a 20 archivos por feature
+          description: `${folder} (${files.length} files)`,
+          folder: folder,
+          file_count: files.length,
+          extensions: [...new Set(files.map(f => f.ext))]
+        });
+        
+        featureId++;
+      } catch (groupError) {
+        log(`ERROR creating feature for folder ${folder}: ${groupError.message}`);
+      }
+    }
+    
+    log(`Generic detection completed: ${features.length} feature groups`);
+    return features;
+    
+  } catch (error) {
+    log(`ERROR in detectFeaturesGeneric: ${error.message}`);
+    return [];
+  }
 }
 
 /**
@@ -1894,15 +2047,29 @@ function createBasicSpec(featureId, validFiles, tech_stack) {
  * Escanea el repositorio y devuelve una lista de funcionalidades detectadas
  */
 async function listFeatures(args) {
-  const repoPath = validateInput("path", args.path, "string", { default: "." });
-  const tech_stack = args.tech_stack || loadTechStack(repoPath);
-  const max_files = validateInput("max_files", args.max_files, "number", { 
-    default: 300, 
-    min: 1, 
-    max: 5000 
-  });
+  let repoPath;
+  let tech_stack;
+  let max_files;
   
-  log(`list_features called: path=${repoPath}, max_files=${max_files}, stack=${JSON.stringify(tech_stack)}`);
+  try {
+    repoPath = validateInput("path", args.path, "string", { default: "." });
+    
+    // Resolver path absoluto
+    repoPath = path.resolve(repoPath);
+    
+    tech_stack = args.tech_stack || loadTechStack(repoPath) || {};
+    max_files = validateInput("max_files", args.max_files, "number", { 
+      default: 300, 
+      min: 1, 
+      max: 5000 
+    });
+  } catch (validationError) {
+    log(`ERROR validating inputs: ${validationError.message}`);
+    throw new Error(`Invalid input parameters: ${validationError.message}`);
+  }
+  
+  log(`list_features called: path=${repoPath}, max_files=${max_files}`);
+  log(`Tech stack: ${JSON.stringify(tech_stack)}`);
   
   try {
     // Verificar que el path existe
@@ -1910,21 +2077,60 @@ async function listFeatures(args) {
       throw new Error(`Repository path does not exist: ${repoPath}`);
     }
     
-    // Detectar features basándose en el tech stack
-    const features = await detectFeatures(repoPath, tech_stack, max_files);
+    // Verificar que es un directorio
+    const stat = fs.statSync(repoPath);
+    if (!stat.isDirectory()) {
+      throw new Error(`Path is not a directory: ${repoPath}`);
+    }
     
-    log(`list_features completed: ${features.length} features found`);
+    // Detectar features basándose en el tech stack
+    let features = [];
+    let detection_method = 'unknown';
+    
+    try {
+      features = await detectFeatures(repoPath, tech_stack, max_files);
+      detection_method = tech_stack.language || 'generic';
+    } catch (detectionError) {
+      log(`ERROR in feature detection: ${detectionError.message}`);
+      log(`Attempting fallback to generic detection`);
+      
+      try {
+        features = detectFeaturesGeneric(repoPath, max_files);
+        detection_method = 'generic_fallback';
+      } catch (fallbackError) {
+        log(`ERROR in generic fallback: ${fallbackError.message}`);
+        throw new Error(`Failed to detect features: ${fallbackError.message}`);
+      }
+    }
+    
+    log(`list_features completed: ${features.length} features found using ${detection_method}`);
     
     return {
-      features,
-      tech_stack,
+      success: true,
+      features: features,
+      features_count: features.length,
+      tech_stack: tech_stack,
       scanned_path: repoPath,
-      total_files_scanned: max_files
+      max_files_limit: max_files,
+      detection_method: detection_method,
+      timestamp: new Date().toISOString()
     };
     
   } catch (error) {
-    log(`ERROR en list_features: ${error.message}`);
-    throw error;
+    log(`FATAL ERROR en list_features: ${error.message}`);
+    log(`Stack trace: ${error.stack}`);
+    
+    // Retornar información útil incluso en caso de error
+    return {
+      success: false,
+      error: error.message,
+      features: [],
+      features_count: 0,
+      scanned_path: repoPath,
+      tech_stack: tech_stack,
+      timestamp: new Date().toISOString(),
+      suggestion: "Try running with a smaller max_files value or check if the path is accessible"
+    };
   }
 }
 
